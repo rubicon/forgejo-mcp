@@ -7,7 +7,9 @@ import type {
   ForgejoConfig,
   Issue,
   PullRequest,
+  Release,
   Repository,
+  Tag,
 } from './types';
 
 type QueryValue = string | number | boolean | undefined;
@@ -192,5 +194,56 @@ export class ForgejoClient {
 
   getCommitStatus(owner: string, repo: string, ref: string): Promise<CommitStatus> {
     return this.request(`${this.repoBase(owner, repo)}/commits/${ForgejoClient.seg(ref)}/status`);
+  }
+
+  listReleases(
+    owner: string,
+    repo: string,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<Release[]> {
+    return this.request(`${this.repoBase(owner, repo)}/releases`, {
+      query: { page: opts.page, limit: opts.limit },
+    });
+  }
+
+  getRelease(owner: string, repo: string, id: number): Promise<Release> {
+    return this.request(`${this.repoBase(owner, repo)}/releases/${id}`);
+  }
+
+  createRelease(
+    owner: string,
+    repo: string,
+    body: {
+      tag_name: string;
+      target_commitish?: string;
+      name?: string;
+      body?: string;
+      draft?: boolean;
+      prerelease?: boolean;
+    },
+  ): Promise<Release> {
+    return this.request(`${this.repoBase(owner, repo)}/releases`, { method: 'POST', body });
+  }
+
+  listTags(
+    owner: string,
+    repo: string,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<Tag[]> {
+    return this.request(`${this.repoBase(owner, repo)}/tags`, {
+      query: { page: opts.page, limit: opts.limit },
+    });
+  }
+
+  getTag(owner: string, repo: string, tag: string): Promise<Tag> {
+    return this.request(`${this.repoBase(owner, repo)}/tags/${ForgejoClient.seg(tag)}`);
+  }
+
+  createTag(
+    owner: string,
+    repo: string,
+    body: { tag_name: string; target?: string; message?: string },
+  ): Promise<Tag> {
+    return this.request(`${this.repoBase(owner, repo)}/tags`, { method: 'POST', body });
   }
 }
