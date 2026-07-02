@@ -6,7 +6,15 @@ import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const EXPECTED_TOOLS = 13;
+const EXPECTED_TOOLS = 19;
+const EXPECTED_NAMES = [
+  'create_release',
+  'list_releases',
+  'get_release',
+  'create_tag',
+  'list_tags',
+  'get_tag',
+];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const server = spawn('node', [join(root, 'dist', 'index.js')], {
@@ -80,6 +88,12 @@ try {
   const count = result?.tools?.length ?? 0;
   if (count !== EXPECTED_TOOLS) {
     fail(`expected ${EXPECTED_TOOLS} tools, got ${count}`);
+  }
+
+  const names = new Set((result?.tools ?? []).map((tool) => tool.name));
+  const missing = EXPECTED_NAMES.filter((name) => !names.has(name));
+  if (missing.length) {
+    fail(`missing expected tools: ${missing.join(', ')}`);
   }
 
   clearTimeout(timeout);

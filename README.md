@@ -33,6 +33,12 @@ issue R/W, user Read).
 | `get_pull_request_diff` | read | Unified diff for a PR as plain text |
 | `create_pull_request` | write | Open a PR from a head branch into a base branch |
 | `get_commit_status` | read | Combined CI/commit status for a ref |
+| `list_releases` | read | List releases; paginated |
+| `get_release` | read | A single release by ID, with notes and draft/prerelease flags |
+| `create_release` | write | Create a release for a tag (draft, prerelease, notes) |
+| `list_tags` | read | List tags with their target commits; paginated |
+| `get_tag` | read | A single tag by name |
+| `create_tag` | write | Create a tag on a branch or commit (optionally annotated) |
 
 ## Configuration
 

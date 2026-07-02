@@ -255,4 +255,105 @@ export const tools: ToolDefinition[] = [
     },
     handler: (c, a) => c.getCommitStatus(req(a, 'owner'), req(a, 'repo'), req(a, 'ref')),
   },
+  {
+    name: 'list_releases',
+    description: 'List repository releases, newest first (includes drafts and prereleases).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        ...pagination,
+      },
+      required: ['owner', 'repo'],
+    },
+    handler: (c, a) =>
+      c.listReleases(req(a, 'owner'), req(a, 'repo'), { page: a.page, limit: a.limit }),
+  },
+  {
+    name: 'get_release',
+    description: 'Get a single release by its numeric ID, including notes, draft, and prerelease flags.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: 'number', description: 'Release ID' },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    handler: (c, a) => c.getRelease(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
+  },
+  {
+    name: 'create_release',
+    description:
+      'Create a release for a tag. Set draft to keep it unpublished or prerelease to mark it early. Additive write.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        tag_name: { type: 'string', description: 'Tag to release; created from target if it does not exist' },
+        target_commitish: { type: 'string', description: 'Branch or commit the tag points at (defaults to the repo default branch)' },
+        name: { type: 'string', description: 'Release title' },
+        body: { type: 'string', description: 'Release notes (Markdown)' },
+        draft: { type: 'boolean', description: 'Create as an unpublished draft' },
+        prerelease: { type: 'boolean', description: 'Mark as a prerelease' },
+      },
+      required: ['owner', 'repo', 'tag_name'],
+    },
+    handler: (c, a) =>
+      c.createRelease(req(a, 'owner'), req(a, 'repo'), {
+        tag_name: req(a, 'tag_name'),
+        target_commitish: a.target_commitish,
+        name: a.name,
+        body: a.body,
+        draft: a.draft,
+        prerelease: a.prerelease,
+      }),
+  },
+  {
+    name: 'list_tags',
+    description: 'List repository tags with their target commits.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        ...pagination,
+      },
+      required: ['owner', 'repo'],
+    },
+    handler: (c, a) =>
+      c.listTags(req(a, 'owner'), req(a, 'repo'), { page: a.page, limit: a.limit }),
+  },
+  {
+    name: 'get_tag',
+    description: 'Get a single tag by name, including its target commit and annotation message.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        tag: { type: 'string', description: 'Tag name' },
+      },
+      required: ['owner', 'repo', 'tag'],
+    },
+    handler: (c, a) => c.getTag(req(a, 'owner'), req(a, 'repo'), req(a, 'tag')),
+  },
+  {
+    name: 'create_tag',
+    description: 'Create a tag on a branch or commit, optionally annotated with a message. Additive write.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        tag_name: { type: 'string', description: 'Name for the new tag' },
+        target: { type: 'string', description: 'Branch or commit to tag (defaults to the repo default branch)' },
+        message: { type: 'string', description: 'Annotation message for an annotated tag' },
+      },
+      required: ['owner', 'repo', 'tag_name'],
+    },
+    handler: (c, a) =>
+      c.createTag(req(a, 'owner'), req(a, 'repo'), {
+        tag_name: req(a, 'tag_name'),
+        target: a.target,
+        message: a.message,
+      }),
+  },
 ];

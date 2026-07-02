@@ -24,14 +24,14 @@ delete branch.**
 ```bash
 npm install
 npm run build      # esbuild -> dist/index.js (single bundled file)
-npm run smoke      # build + token-free MCP handshake; must report 13 tools
+npm run smoke      # build + token-free MCP handshake; must report 19 tools
 npm run typecheck  # tsc --noEmit
 ```
 
 ## Architecture
 
 See `ARCHITECTURE.md`. In brief: `src/index.ts` wires MCP over stdio;
-`src/client.ts` is the typed Forgejo REST client; `src/tools.ts` holds the 13
+`src/client.ts` is the typed Forgejo REST client; `src/tools.ts` holds the 19
 tool definitions and handlers; `src/types.ts` has the API response shapes.
 esbuild bundles everything to a single `dist/index.js`. `scripts/smoke.mjs` is
 the only check.
