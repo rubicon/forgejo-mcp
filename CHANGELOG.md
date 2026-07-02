@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/rubicon/forgejo-mcp/compare/v0.1.0...v0.2.0) (2026-07-02)
+
+
+### Added
+
+* initial clean-room Apache-2.0 forgejo-mcp server (13 tools) ([8b8d407](https://github.com/rubicon/forgejo-mcp/commit/8b8d4073d2049a56e59dabb79805b97990425de9))
+
 ## [0.1.0] - 2026-07-02
 
 Initial release. Independent, clean-room Model Context Protocol server for
