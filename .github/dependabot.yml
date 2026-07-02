@@ -1,0 +1,25 @@
+# Dependency updates. Uses the .yml extension because GitHub requires this exact
+# filename (documented escape hatch to the .yaml house rule).
+#
+# Commit prefixes are set so Dependabot's own commits pass the commitlint gate
+# and stay out of the user-facing changelog (chore/ci are hidden sections).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope

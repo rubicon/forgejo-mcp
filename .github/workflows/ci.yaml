@@ -1,0 +1,52 @@
+# Build and test quality gate.
+#
+# Required check for branch protection on `main`: "ci-passed".
+# The matrix jobs report as "build (18)" etc. and are intentionally NOT the
+# required check — pin only the stable aggregate job so the matrix can change
+# without touching branch protection.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run smoke # runs the build, then the token-free MCP handshake
+
+  ci-passed:
+    name: ci-passed
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all build jobs passed
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "::error::One or more build matrix jobs did not succeed (result: ${{ needs.build.result }})"
+            exit 1
+          fi
+          echo "All build matrix jobs passed."

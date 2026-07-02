@@ -1,0 +1,28 @@
+# Release automation.
+#
+# Runs on every push to `main`. release-please maintains a rolling "release PR"
+# that accumulates Conventional Commits into a Keep a Changelog entry and the
+# SemVer bump. Merging that PR tags the release (v-prefixed) and creates the
+# GitHub Release object.
+#
+# The witty opening paragraph required by the Release Notes Standard is added by
+# the maintainer to the generated notes before publishing; release-please
+# produces the structured body, the human adds the voice.
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
