@@ -73,7 +73,7 @@ jobs:
       - name: Dependabot exempt
         if: github.actor == 'dependabot[bot]'
         run: echo "Dependabot PR; commitlint not applicable."
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: github.actor != 'dependabot[bot]'
         with:
           fetch-depth: 0 # commitlint needs full history to lint the PR's commit range
