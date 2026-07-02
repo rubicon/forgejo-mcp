@@ -69,6 +69,14 @@ npm run smoke     # builds, then runs a token-free MCP handshake + tools/list
 npm run typecheck # tsc --noEmit
 ```
 
+## Contributors
+
+[![Contributors](https://contrib.rocks/image?repo=rubicon/forgejo-mcp)](https://github.com/rubicon/forgejo-mcp/graphs/contributors)
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) to get started, the
+[Code of Conduct](CODE_OF_CONDUCT.md) for community expectations, and
+[SECURITY.md](SECURITY.md) to report a vulnerability privately.
+
 ## License and attribution
 
 Licensed under the [Apache License 2.0](LICENSE). This is an independent,
