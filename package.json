@@ -1,0 +1,46 @@
+{
+  "name": "@rubicontv/forgejo-mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for Forgejo/Gitea: read tools plus safe additive writes (issues, comments, pull requests). No merge, delete, or admin surface.",
+  "license": "Apache-2.0",
+  "author": "Dax Davis <dax@rubicontv.com>",
+  "type": "module",
+  "bin": {
+    "forgejo-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rubicon/forgejo-mcp.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "forgejo",
+    "gitea",
+    "claude"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "dev": "npm run build && node dist/index.js",
+    "smoke": "npm run build && node scripts/smoke.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}

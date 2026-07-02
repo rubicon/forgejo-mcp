@@ -1,0 +1,13 @@
+forgejo-mcp
+Copyright 2026 Dax Davis / Rubicon TechVentures
+
+Licensed under the Apache License, Version 2.0 (the "License").
+
+This is an independent, clean-room implementation of a Model Context Protocol
+(MCP) server for Forgejo/Gitea. It shares no source code with any prior work;
+it is written against the Model Context Protocol SDK and the Forgejo/Gitea
+OpenAPI specification.
+
+It was inspired by the earlier project nsvk13/forgejo-mcp-server
+(https://github.com/nsvk13/forgejo-mcp-server), to whose author thanks are due
+for demonstrating the idea.
