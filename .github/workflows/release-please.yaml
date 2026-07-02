@@ -24,5 +24,8 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         with:
+          # PAT (not the default GITHUB_TOKEN) so the release PR is user-authored
+          # and triggers CI — otherwise required checks never run and it blocks.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
