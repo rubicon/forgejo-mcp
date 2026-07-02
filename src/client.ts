@@ -3,9 +3,12 @@
 import type {
   Comment,
   CommitStatus,
+  DeleteBranchResult,
   FileContent,
   ForgejoConfig,
   Issue,
+  MergeResult,
+  MergeStyle,
   PullRequest,
   Release,
   Repository,
@@ -19,6 +22,8 @@ interface RequestOptions {
   method?: string;
   query?: Query;
   body?: unknown;
+  /** Override the bearer token for a single request (used by elevated ops). */
+  token?: string;
 }
 
 /**
@@ -35,14 +40,16 @@ interface RequestOptions {
 export class ForgejoClient {
   private readonly baseUrl: string;
   private readonly token: string;
+  private readonly elevatedToken: string;
 
   constructor(config: ForgejoConfig) {
     this.baseUrl = (config.baseUrl ?? '').replace(/\/+$/, '');
     this.token = config.token ?? '';
+    this.elevatedToken = config.elevatedToken ?? '';
   }
 
-  private ensureConfigured(): void {
-    if (!this.baseUrl || !this.token) {
+  private ensureConfigured(token: string): void {
+    if (!this.baseUrl || !token) {
       throw new Error('FORGEJO_BASE_URL and FORGEJO_TOKEN must be set.');
     }
   }
@@ -58,13 +65,13 @@ export class ForgejoClient {
   }
 
   private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-    this.ensureConfigured();
-    const { method = 'GET', query, body } = options;
+    const { method = 'GET', query, body, token = this.token } = options;
+    this.ensureConfigured(token);
 
     const response = await fetch(this.buildUrl(path, query), {
       method,
       headers: {
-        Authorization: `token ${this.token}`,
+        Authorization: `token ${token}`,
         Accept: 'application/json',
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
@@ -73,11 +80,28 @@ export class ForgejoClient {
 
     if (!response.ok) throw await this.error(method, path, response);
     if (response.status === 204) return undefined as T;
-    return (await response.json()) as T;
+    // Some write endpoints (e.g. merge) answer 200 with an empty body; don't
+    // choke on the absent JSON.
+    const text = await response.text();
+    return (text ? JSON.parse(text) : undefined) as T;
+  }
+
+  /**
+   * Perform a request with the elevated token. Refuses to fall back to the
+   * default token — the elevated tier is a distinct trust boundary, and an
+   * elevated op running under the read/write token would defeat its purpose.
+   */
+  private requestElevated<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    if (!this.elevatedToken) {
+      throw new Error(
+        'Elevated operation requires FORGEJO_MCP_ELEVATED_TOKEN; refusing to use the default token.',
+      );
+    }
+    return this.request<T>(path, { ...options, token: this.elevatedToken });
   }
 
   private async requestText(path: string): Promise<string> {
-    this.ensureConfigured();
+    this.ensureConfigured(this.token);
     const response = await fetch(this.buildUrl(path), {
       headers: { Authorization: `token ${this.token}` },
     });
@@ -194,6 +218,31 @@ export class ForgejoClient {
 
   getCommitStatus(owner: string, repo: string, ref: string): Promise<CommitStatus> {
     return this.request(`${this.repoBase(owner, repo)}/commits/${ForgejoClient.seg(ref)}/status`);
+  }
+
+  // --- Elevated (destructive) operations -----------------------------------
+  // These run under the elevated token only; see requestElevated above.
+
+  async mergePullRequest(
+    owner: string,
+    repo: string,
+    index: number,
+    opts: { style?: MergeStyle } = {},
+  ): Promise<MergeResult> {
+    const strategy = opts.style ?? 'merge';
+    await this.requestElevated(`${this.repoBase(owner, repo)}/pulls/${index}/merge`, {
+      method: 'POST',
+      body: { Do: strategy },
+    });
+    return { merged: true, index, strategy };
+  }
+
+  async deleteBranch(owner: string, repo: string, branch: string): Promise<DeleteBranchResult> {
+    await this.requestElevated(
+      `${this.repoBase(owner, repo)}/branches/${ForgejoClient.seg(branch)}`,
+      { method: 'DELETE' },
+    );
+    return { deleted: true, branch };
   }
 
   listReleases(

@@ -3,6 +3,26 @@
 export interface ForgejoConfig {
   baseUrl: string;
   token: string;
+  /**
+   * Separately-scoped token used ONLY for elevated (destructive) operations.
+   * When unset, the client refuses to perform elevated ops — the default
+   * `token` is never used for merge/delete. See the elevated tier in tools.ts.
+   */
+  elevatedToken?: string;
+}
+
+/** Merge strategy accepted by `merge_pull_request` (Forgejo `Do` field). */
+export type MergeStyle = 'merge' | 'rebase' | 'squash';
+
+export interface MergeResult {
+  merged: boolean;
+  index: number;
+  strategy: MergeStyle;
+}
+
+export interface DeleteBranchResult {
+  deleted: boolean;
+  branch: string;
 }
 
 export interface User {

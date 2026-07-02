@@ -357,3 +357,54 @@ export const tools: ToolDefinition[] = [
       }),
   },
 ];
+
+/**
+ * Elevated (destructive) tier — OPT-IN, OFF BY DEFAULT.
+ *
+ * These are concatenated onto `tools` in src/index.ts ONLY when the double gate
+ * is satisfied: `FORGEJO_MCP_ELEVATED=1` AND a distinct `FORGEJO_MCP_ELEVATED_TOKEN`.
+ * The default read/write token never performs these operations.
+ *
+ * Deliberately minimal: merge and delete-branch only. User, secret, permission,
+ * and org-admin writes are PERMANENTLY EXCLUDED — they are never appropriate to
+ * hand to an LLM that reads untrusted content, regardless of this flag.
+ */
+export const elevatedTools: ToolDefinition[] = [
+  {
+    name: 'merge_pull_request',
+    description:
+      '[ELEVATED — DESTRUCTIVE] Merge a pull request into its base branch. This ' +
+      'writes to the default branch and cannot be undone from here. Style is one ' +
+      'of merge (default), rebase, or squash.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Pull request number' },
+        style: {
+          type: 'string',
+          enum: ['merge', 'rebase', 'squash'],
+          description: 'Merge strategy (default: merge)',
+        },
+      },
+      required: ['owner', 'repo', 'index'],
+    },
+    handler: (c, a) =>
+      c.mergePullRequest(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), { style: a.style }),
+  },
+  {
+    name: 'delete_branch',
+    description:
+      '[ELEVATED — DESTRUCTIVE] Permanently delete a branch. This cannot be undone; ' +
+      'unmerged commits on the branch may be lost.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        branch: { type: 'string', description: 'Branch name to delete' },
+      },
+      required: ['owner', 'repo', 'branch'],
+    },
+    handler: (c, a) => c.deleteBranch(req(a, 'owner'), req(a, 'repo'), req(a, 'branch')),
+  },
+];

@@ -12,9 +12,14 @@ whole server bundles to a single `dist/index.js` with no runtime framework.
 
 The server exposes **read tools plus additive writes only** — creating issues,
 issue/PR comments, and pull requests. There are deliberately **no merge, delete,
-or admin tools**. This keeps it safe for unattended use and caps the blast
-radius of the API token. Pair it with a least-privilege token (repository R/W,
-issue R/W, user Read).
+or admin tools** in the default surface. This keeps it safe for unattended use
+and caps the blast radius of the API token. Pair it with a least-privilege token
+(repository R/W, issue R/W, user Read).
+
+A small set of destructive operations is available behind an
+[opt-in, off-by-default elevated tier](#elevated-tier-opt-in-off-by-default).
+With no elevated environment variables set, the tool surface is byte-identical
+to the safe default described above.
 
 ## Tools
 
@@ -65,6 +70,85 @@ Never hardcode the token; inject it from a secret store at launch.
   }
 }
 ```
+
+## Elevated tier (opt-in, off by default)
+
+The server can optionally expose a **minimal set of destructive tools**. This
+tier is **off by default** and must be deliberately enabled by the operator.
+
+| Tool | Kind | Operation |
+|------|------|-----------|
+| `merge_pull_request` | elevated | Merge a PR (`merge` / `rebase` / `squash`) into its base branch |
+| `delete_branch` | elevated | Permanently delete a branch |
+
+Each elevated tool's description is prefixed with `[ELEVATED — DESTRUCTIVE]`.
+
+### Why it is gated so carefully
+
+This server hands tools to an LLM that reads **untrusted content** — issue
+bodies, PR text, file contents. That is a prompt-injection surface: a misled
+agent should never be able to merge or delete anything. So the elevated tier is
+**double-gated** and uses a **separate token**.
+
+### Enabling it — the double gate
+
+Elevated tools are registered **only when BOTH** of these are set:
+
+- `FORGEJO_MCP_ELEVATED=1` — an explicit opt-in flag, and
+- `FORGEJO_MCP_ELEVATED_TOKEN` — a token **distinct** from `FORGEJO_TOKEN`.
+
+The default `FORGEJO_TOKEN` **never** performs an elevated operation — elevated
+calls use `FORGEJO_MCP_ELEVATED_TOKEN` exclusively. Scope that token to only the
+repositories and permissions the destructive tools actually need.
+
+If `FORGEJO_MCP_ELEVATED=1` is set but `FORGEJO_MCP_ELEVATED_TOKEN` is missing,
+the server **fails closed**: the elevated tools are not registered and a warning
+is logged to stderr.
+
+```json
+{
+  "mcpServers": {
+    "forgejo": {
+      "command": "node",
+      "args": ["/path/to/forgejo-mcp/dist/index.js"],
+      "env": {
+        "FORGEJO_BASE_URL": "https://git.example.com",
+        "FORGEJO_TOKEN": "…read/write token…",
+        "FORGEJO_MCP_ELEVATED": "1",
+        "FORGEJO_MCP_ELEVATED_TOKEN": "…distinct, narrowly-scoped token…"
+      }
+    }
+  }
+}
+```
+
+### ⚠️ Allowlist warning — read before enabling
+
+This MCP is commonly **whole-server allowlisted** (e.g. `mcp__forgejo`) so an
+agent can use it autonomously without per-call prompts. **If you enable the
+elevated tier under a blanket allowlist, the destructive tools also run without
+any prompt.** A single prompt-injection payload in an issue or PR could then
+merge or delete on your behalf.
+
+Therefore, when the elevated tier is on:
+
+- **Do NOT blanket-allow the whole server** (`mcp__forgejo`).
+- **Allowlist only the specific safe tools** you want to run autonomously
+  (e.g. `mcp__forgejo__create_issue`), and leave `merge_pull_request` /
+  `delete_branch` to require an explicit prompt each time.
+
+The server cannot enforce the client's allowlist — distinct tool naming and this
+warning are the mitigation. Enabling elevated tools is a decision the operator
+owns.
+
+### Permanently excluded
+
+The elevated tier is intentionally tiny. The following are **never** exposed,
+regardless of any flag: user management, secret/variable writes, permission or
+collaborator changes, and org/repo admin. Those are not appropriate to hand to
+an LLM that reads untrusted content, so they stay out by design. Adding any
+destructive tool requires explicit owner sign-off and a matching token-scope
+review.
 
 ## Build and test
 
