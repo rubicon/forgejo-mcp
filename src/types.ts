@@ -117,3 +117,30 @@ export interface CommitStatus {
     target_url: string;
   }>;
 }
+
+export interface Release {
+  id: number;
+  tag_name: string;
+  target_commitish: string;
+  name: string;
+  body: string;
+  url: string;
+  html_url: string;
+  draft: boolean;
+  prerelease: boolean;
+  author: User;
+  created_at: string;
+  published_at: string;
+}
+
+export interface Tag {
+  name: string;
+  message?: string;
+  id: string;
+  commit: {
+    sha: string;
+    url: string;
+  };
+  zipball_url?: string;
+  tarball_url?: string;
+}
