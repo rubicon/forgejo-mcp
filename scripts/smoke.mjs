@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) 2026 Dax Davis / Rubicon TechVentures
 // Token-free smoke test: spawn the built server, complete an MCP handshake,
 // list tools, and assert the expected count. No Forgejo token required.
 import { spawn } from 'node:child_process';

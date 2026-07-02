@@ -1,0 +1,79 @@
+# Pull-request policy enforcement.
+#
+# Required checks for branch protection on `main`:
+#   "branch-name", "pr-title", "commitlint", "pr-links-issue".
+#
+# Enforces the General Repository Process Policy on every PR:
+#   - branch name matches ^dev/<issue>-<slug>$
+#   - PR title uses a Conventional Commits type
+#   - every commit message uses a Conventional Commits type
+#   - PR body links its issue with a closing keyword (Closes #N)
+name: PR Policy
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  branch-name:
+    name: branch-name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch name
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          echo "Head branch: $HEAD_REF"
+          if ! printf '%s' "$HEAD_REF" | grep -Eq '^dev/[0-9]+-[a-z0-9.-]+$'; then
+            echo "::error::Branch '$HEAD_REF' must match ^dev/[0-9]+-[a-z0-9.-]+\$ (e.g. dev/12-add-list-branches-tool)"
+            exit 1
+          fi
+
+  pr-title:
+    name: pr-title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Keep in sync with @commitlint/config-conventional (commitlint.config.mjs).
+          types: |
+            feat
+            fix
+            chore
+            docs
+            test
+            ci
+            refactor
+            build
+            perf
+            revert
+            style
+
+  commitlint:
+    name: commitlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # commitlint needs full history to lint the PR's commit range
+      - uses: wagoid/commitlint-github-action@v6
+
+  pr-links-issue:
+    name: pr-links-issue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR body closes an issue
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if ! printf '%s' "$PR_BODY" | grep -Eiq '(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[[:space:]]+#[0-9]+'; then
+            echo "::error::PR body must link its issue with a closing keyword, e.g. 'Closes #1'."
+            exit 1
+          fi
+          echo "PR body links an issue."
