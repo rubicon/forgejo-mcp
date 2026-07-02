@@ -8,6 +8,13 @@
 #   - PR title uses a Conventional Commits type
 #   - every commit message uses a Conventional Commits type
 #   - PR body links its issue with a closing keyword (Closes #N)
+#
+# Dependabot is exempt from branch-name, commitlint, and pr-links-issue: its
+# branches are dependabot/*, its bodies carry no issue link, and its long commit
+# bodies trip commitlint's body-max-line-length. Each of those jobs still runs
+# and concludes green for Dependabot (via a passthrough step) so the required
+# checks stay satisfied, while remaining fully enforced for human PRs. pr-title
+# is not exempt: Dependabot titles are already Conventional Commits.
 name: PR Policy
 
 on:
@@ -23,7 +30,11 @@ jobs:
     name: branch-name
     runs-on: ubuntu-latest
     steps:
+      - name: Dependabot exempt
+        if: github.actor == 'dependabot[bot]'
+        run: echo "Dependabot PR; branch-name policy not applicable."
       - name: Validate branch name
+        if: github.actor != 'dependabot[bot]'
         env:
           HEAD_REF: ${{ github.head_ref }}
         run: |
@@ -59,16 +70,25 @@ jobs:
     name: commitlint
     runs-on: ubuntu-latest
     steps:
+      - name: Dependabot exempt
+        if: github.actor == 'dependabot[bot]'
+        run: echo "Dependabot PR; commitlint not applicable."
       - uses: actions/checkout@v4
+        if: github.actor != 'dependabot[bot]'
         with:
           fetch-depth: 0 # commitlint needs full history to lint the PR's commit range
       - uses: wagoid/commitlint-github-action@v6
+        if: github.actor != 'dependabot[bot]'
 
   pr-links-issue:
     name: pr-links-issue
     runs-on: ubuntu-latest
     steps:
+      - name: Dependabot exempt
+        if: github.actor == 'dependabot[bot]'
+        run: echo "Dependabot PR; issue-link policy not applicable."
       - name: Verify PR body closes an issue
+        if: github.actor != 'dependabot[bot]'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
