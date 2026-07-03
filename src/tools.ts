@@ -328,6 +328,56 @@ export const tools: ToolDefinition[] = [
     handler: (c, a) => c.getCommitStatus(req(a, 'owner'), req(a, 'repo'), req(a, 'ref')),
   },
   {
+    name: 'list_branches',
+    description: 'List repository branches with their latest commit and protection status; paginated.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        ...pagination,
+      },
+      required: ['owner', 'repo'],
+    },
+    handler: (c, a) =>
+      c.listBranches(req(a, 'owner'), req(a, 'repo'), { page: a.page, limit: a.limit }),
+  },
+  {
+    name: 'get_branch',
+    description: 'Get a single branch by name, including its latest commit and protection status.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        branch: { type: 'string', description: 'Branch name' },
+      },
+      required: ['owner', 'repo', 'branch'],
+    },
+    handler: (c, a) => c.getBranch(req(a, 'owner'), req(a, 'repo'), req(a, 'branch')),
+  },
+  {
+    name: 'create_branch',
+    description:
+      'Create a branch. old_ref_name is the source branch, tag, or commit to branch from ' +
+      '(defaults to the repo default branch). Additive write; no branch is deleted or moved.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        new_branch_name: { type: 'string', description: 'Name for the new branch' },
+        old_ref_name: {
+          type: 'string',
+          description: 'Source branch, tag, or commit to branch from (defaults to the repo default branch)',
+        },
+      },
+      required: ['owner', 'repo', 'new_branch_name'],
+    },
+    handler: (c, a) =>
+      c.createBranch(req(a, 'owner'), req(a, 'repo'), {
+        new_branch_name: req(a, 'new_branch_name'),
+        old_ref_name: a.old_ref_name,
+      }),
+  },
+  {
     name: 'list_releases',
     description: 'List repository releases, newest first (includes drafts and prereleases).',
     inputSchema: {
