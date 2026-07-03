@@ -6,6 +6,10 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { ForgejoClient } from './client';
 import { elevatedTools, tools } from './tools';
 
+// Replaced at build time by esbuild `define` with the version from package.json
+// (see scripts/build.mjs), so the MCP handshake never advertises a stale literal.
+declare const __PKG_VERSION__: string;
+
 /**
  * Decide whether the opt-in elevated (destructive) tier is active.
  *
@@ -47,7 +51,7 @@ async function main(): Promise<void> {
   const activeTools = elevation.active ? [...tools, ...elevatedTools] : tools;
 
   const server = new Server(
-    { name: 'forgejo-mcp', version: '0.1.0' },
+    { name: 'forgejo-mcp', version: __PKG_VERSION__ },
     { capabilities: { tools: {} } },
   );
 
