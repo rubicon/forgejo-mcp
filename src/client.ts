@@ -3,7 +3,9 @@
 import type {
   Comment,
   CommitStatus,
+  ContentsResponse,
   DeleteBranchResult,
+  FileChangeResponse,
   FileContent,
   ForgejoConfig,
   Issue,
@@ -187,6 +189,43 @@ export class ForgejoClient {
   getFileContent(owner: string, repo: string, filepath: string, ref?: string): Promise<FileContent> {
     return this.request(`${this.repoBase(owner, repo)}/contents/${ForgejoClient.filePath(filepath)}`, {
       query: { ref },
+    });
+  }
+
+  /** List a directory's entries. Omit `path` for the repository root. */
+  listContents(
+    owner: string,
+    repo: string,
+    path?: string,
+    ref?: string,
+  ): Promise<ContentsResponse[] | ContentsResponse> {
+    const suffix = path ? `/${ForgejoClient.filePath(path)}` : '';
+    return this.request(`${this.repoBase(owner, repo)}/contents${suffix}`, { query: { ref } });
+  }
+
+  /** Create a new file. `content` must already be base64-encoded. */
+  createFile(
+    owner: string,
+    repo: string,
+    filepath: string,
+    body: { content: string; message?: string; branch?: string; new_branch?: string },
+  ): Promise<FileChangeResponse> {
+    return this.request(`${this.repoBase(owner, repo)}/contents/${ForgejoClient.filePath(filepath)}`, {
+      method: 'POST',
+      body,
+    });
+  }
+
+  /** Replace an existing file. `content` must already be base64-encoded. */
+  updateFile(
+    owner: string,
+    repo: string,
+    filepath: string,
+    body: { content: string; sha?: string; message?: string; branch?: string },
+  ): Promise<FileChangeResponse> {
+    return this.request(`${this.repoBase(owner, repo)}/contents/${ForgejoClient.filePath(filepath)}`, {
+      method: 'PUT',
+      body,
     });
   }
 

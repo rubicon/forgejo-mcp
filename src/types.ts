@@ -84,6 +84,32 @@ export interface FileContent {
   content?: string;
 }
 
+/** A single entry returned by the contents API (file or directory listing). */
+export interface ContentsResponse {
+  name: string;
+  path: string;
+  sha: string;
+  type: string;
+  size: number;
+  encoding?: string;
+  content?: string;
+  target?: string;
+  html_url?: string;
+  download_url?: string;
+}
+
+export interface FileCommitResponse {
+  sha: string;
+  html_url: string;
+  message: string;
+}
+
+/** Result of a create/update file write: the new content plus the commit. */
+export interface FileChangeResponse {
+  content: ContentsResponse | null;
+  commit: FileCommitResponse;
+}
+
 export interface PullRequestRef {
   ref: string;
   label: string;
