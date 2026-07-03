@@ -22,10 +22,18 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      # Mint a token from the `rubicon-release-please` GitHub App. Commits authored
+      # via an App token are auto-verified/signed by GitHub, so the release PR
+      # satisfies `main`'s required-signed-commits rule (a PAT pushes unsigned bot
+      # commits, which the branch protection rejects). The App token also triggers
+      # CI, so required checks still run.
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_PLEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_KEY }}
       - uses: googleapis/release-please-action@v4
         with:
-          # PAT (not the default GITHUB_TOKEN) so the release PR is user-authored
-          # and triggers CI — otherwise required checks never run and it blocks.
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
