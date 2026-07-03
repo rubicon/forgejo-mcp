@@ -1,6 +1,6 @@
 {
   "name": "@rubicontv/forgejo-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Model Context Protocol server for Forgejo/Gitea: read tools plus safe additive writes (issues, comments, pull requests). No merge, delete, or admin surface.",
   "license": "Apache-2.0",
   "author": "Dax Davis <dax@rubicontv.com>",
