@@ -1,0 +1,40 @@
+# Publish to npm.
+#
+# Fires when a GitHub Release is published (release-please cuts the Release when
+# its release PR merges), so npm never drifts behind the GitHub releases again.
+# `workflow_dispatch` allows an on-demand (re)publish of the current default
+# branch — used to publish a release that was cut before this workflow existed.
+#
+# Requires the `NPM_TOKEN` repository secret: an npm automation token scoped to
+# publish `@rubicontv/forgejo-mcp`. Provenance is enabled, which needs the
+# `id-token: write` permission and a public repo.
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required for npm provenance
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run smoke # build + token-free MCP handshake before we publish
+      - run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
