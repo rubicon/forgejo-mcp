@@ -64,6 +64,55 @@ Never hardcode the token; inject it from a secret store at launch.
 
 ### Claude Code
 
+Two setups, both good — pick by whether you value portability or keeping the
+token out of Claude's config file.
+
+#### Option A — `npx` (recommended)
+
+Once the package is on npm, no local checkout or build is needed:
+
+```sh
+claude mcp add forgejo \
+  --env FORGEJO_BASE_URL=https://git.example.com \
+  --env FORGEJO_TOKEN=... \
+  -- npx -y @rubicontv/forgejo-mcp
+```
+
+Portable and self-updating. Note this stores the token in Claude Code's config
+(`~/.claude.json`). If you would rather the token never touch that file, use
+Option B.
+
+#### Option B — local wrapper (keeps the token out of config)
+
+A small launcher sources a `chmod 600` env file at startup, so the token lives
+only in that file (ideally hydrated from a secret manager) and never in
+`~/.claude.json`:
+
+```sh
+#!/bin/sh
+# ~/.config/forgejo-mcp/launch.sh
+set -eu
+. "$HOME/.config/forgejo-mcp/forgejo-mcp.env"   # sets FORGEJO_BASE_URL, FORGEJO_TOKEN
+export FORGEJO_BASE_URL FORGEJO_TOKEN
+exec npx -y @rubicontv/forgejo-mcp                # or: exec node /path/to/forgejo-mcp/dist/index.js
+```
+
+Point Claude Code at the wrapper — no `env` block, so no secret in the config:
+
+```json
+{
+  "mcpServers": {
+    "forgejo": {
+      "command": "/Users/you/.config/forgejo-mcp/launch.sh"
+    }
+  }
+}
+```
+
+#### Running from a local build (no npm)
+
+If you are working from a checkout instead of the published package:
+
 ```json
 {
   "mcpServers": {
@@ -78,6 +127,28 @@ Never hardcode the token; inject it from a secret store at launch.
   }
 }
 ```
+
+#### Allowlisting
+
+To let an agent use the server without a prompt on every call, allowlist it. On
+the **safe default surface** (no elevated tier), blanket-allowlisting the whole
+server is fine:
+
+```
+mcp__forgejo
+```
+
+**If you turn on the elevated tier, do _not_ do this** — a blanket allowlist
+would let `merge_pull_request` / `delete_branch` run without a prompt too.
+Allowlist only the specific safe tools instead, e.g.:
+
+```
+mcp__forgejo__create_issue
+mcp__forgejo__create_pull_request
+```
+
+See the allowlist warning in the [Elevated tier](#elevated-tier-opt-in-off-by-default)
+section below.
 
 ## Elevated tier (opt-in, off by default)
 
