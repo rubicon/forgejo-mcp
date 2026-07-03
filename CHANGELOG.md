@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/rubicon/forgejo-mcp/compare/v0.1.0...v0.2.0) (2026-07-03)
+
+
+### Added
+
+* add opt-in elevated tier (merge_pull_request, delete_branch) ([#25](https://github.com/rubicon/forgejo-mcp/issues/25)) ([ffd877e](https://github.com/rubicon/forgejo-mcp/commit/ffd877e4178011da488bd32bde39069320aef204)), closes [#22](https://github.com/rubicon/forgejo-mcp/issues/22)
+* add release + tag tools (create/list/get) ([#24](https://github.com/rubicon/forgejo-mcp/issues/24)) ([f0d2313](https://github.com/rubicon/forgejo-mcp/commit/f0d2313209f3f4bd8ff5541cdfc0ff490d0b4190)), closes [#21](https://github.com/rubicon/forgejo-mcp/issues/21)
+
 ## [0.1.0] - 2026-07-02
 
 Initial release. Independent, clean-room Model Context Protocol server for
