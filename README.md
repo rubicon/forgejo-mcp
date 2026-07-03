@@ -44,6 +44,8 @@ to the safe default described above.
 | `list_branches` | read | List branches with latest commit and protection status; paginated |
 | `get_branch` | read | A single branch by name |
 | `create_branch` | write | Create a branch from a source ref (default branch if none) |
+| `list_commits` | read | List commits; filter by start ref and path; paginated |
+| `get_commit` | read | A single commit by SHA or ref |
 | `list_releases` | read | List releases; paginated |
 | `get_release` | read | A single release by ID, with notes and draft/prerelease flags |
 | `create_release` | write | Create a release for a tag (draft, prerelease, notes) |

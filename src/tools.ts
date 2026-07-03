@@ -355,6 +355,42 @@ export const tools: ToolDefinition[] = [
     handler: (c, a) => c.getBranch(req(a, 'owner'), req(a, 'repo'), req(a, 'branch')),
   },
   {
+    name: 'list_commits',
+    description:
+      'List commits, newest first. sha selects the starting branch, tag, or commit ' +
+      '(defaults to the repo default branch); path limits to commits touching that file. Paginated.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        sha: { type: 'string', description: 'Starting branch, tag, or commit (defaults to the repo default branch)' },
+        path: { type: 'string', description: 'Only commits that touched this file path' },
+        ...pagination,
+      },
+      required: ['owner', 'repo'],
+    },
+    handler: (c, a) =>
+      c.listCommits(req(a, 'owner'), req(a, 'repo'), {
+        sha: a.sha,
+        path: a.path,
+        page: a.page,
+        limit: a.limit,
+      }),
+  },
+  {
+    name: 'get_commit',
+    description: 'Get a single commit by SHA (or ref), including its message, author, and committer.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        sha: { type: 'string', description: 'Commit SHA or ref' },
+      },
+      required: ['owner', 'repo', 'sha'],
+    },
+    handler: (c, a) => c.getCommit(req(a, 'owner'), req(a, 'repo'), req(a, 'sha')),
+  },
+  {
     name: 'create_branch',
     description:
       'Create a branch. old_ref_name is the source branch, tag, or commit to branch from ' +

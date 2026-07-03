@@ -3,6 +3,7 @@
 import type {
   Branch,
   Comment,
+  Commit,
   CommitStatus,
   ContentsResponse,
   DeleteBranchResult,
@@ -272,6 +273,20 @@ export class ForgejoClient {
 
   getBranch(owner: string, repo: string, branch: string): Promise<Branch> {
     return this.request(`${this.repoBase(owner, repo)}/branches/${ForgejoClient.seg(branch)}`);
+  }
+
+  listCommits(
+    owner: string,
+    repo: string,
+    opts: { sha?: string; path?: string; page?: number; limit?: number } = {},
+  ): Promise<Commit[]> {
+    return this.request(`${this.repoBase(owner, repo)}/commits`, {
+      query: { sha: opts.sha, path: opts.path, page: opts.page, limit: opts.limit },
+    });
+  }
+
+  getCommit(owner: string, repo: string, sha: string): Promise<Commit> {
+    return this.request(`${this.repoBase(owner, repo)}/git/commits/${ForgejoClient.seg(sha)}`);
   }
 
   createBranch(

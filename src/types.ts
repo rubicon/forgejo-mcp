@@ -132,6 +132,19 @@ export interface PullRequest {
   updated_at: string;
 }
 
+export interface Commit {
+  sha: string;
+  html_url: string;
+  created?: string;
+  commit: {
+    message: string;
+    author?: { name: string; email: string; date: string };
+    committer?: { name: string; email: string; date: string };
+  };
+  author?: User | null;
+  committer?: User | null;
+}
+
 export interface Branch {
   name: string;
   commit?: { id: string; message?: string };
