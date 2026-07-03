@@ -7,8 +7,8 @@ import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 22 (through #35) + 3 branch tools (#38) = 25 base tools; elevated adds 2 more.
-const BASE_TOOLS = 25;
+// 25 (through #38) + 2 commit tools (#40) = 27 base tools; elevated adds 2 more.
+const BASE_TOOLS = 27;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -23,6 +23,8 @@ const EXPECTED_NAMES = [
   'list_branches',
   'get_branch',
   'create_branch',
+  'list_commits',
+  'get_commit',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
