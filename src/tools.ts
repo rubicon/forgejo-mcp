@@ -175,6 +175,78 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
+    name: 'list_directory',
+    description:
+      'List the entries in a repository directory (name, path, type, size, SHA). ' +
+      'Omit path for the repository root; omit ref for the default branch.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        path: { type: 'string', description: 'Directory path within the repository (omit for the root)' },
+        ref: { type: 'string', description: 'Branch, tag, or commit (defaults to the repo default branch)' },
+      },
+      required: ['owner', 'repo'],
+    },
+    handler: (c, a) => c.listContents(req(a, 'owner'), req(a, 'repo'), a.path, a.ref),
+  },
+  {
+    name: 'create_file',
+    description:
+      'Create a new file. content is plain UTF-8 text (base64-encoded for you). Commits to ' +
+      'branch (default branch if omitted), or set new_branch to commit onto a fresh branch. ' +
+      'Additive write; fails if the file already exists — use update_file to change one.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        path: { type: 'string', description: 'File path within the repository' },
+        content: { type: 'string', description: 'File content as plain UTF-8 text' },
+        message: { type: 'string', description: 'Commit message' },
+        branch: { type: 'string', description: 'Branch to commit to (defaults to the repo default branch)' },
+        new_branch: { type: 'string', description: 'Create and commit onto a new branch from branch instead' },
+      },
+      required: ['owner', 'repo', 'path', 'content'],
+    },
+    handler: (c, a) =>
+      c.createFile(req(a, 'owner'), req(a, 'repo'), req(a, 'path'), {
+        content: Buffer.from(req<string>(a, 'content'), 'utf-8').toString('base64'),
+        message: a.message,
+        branch: a.branch,
+        new_branch: a.new_branch,
+      }),
+  },
+  {
+    name: 'update_file',
+    description:
+      'Update an existing file. content is plain UTF-8 text (base64-encoded for you) and ' +
+      'REPLACES the file. Pass sha (the current blob SHA from get_file_content) to guard ' +
+      'against overwriting concurrent changes. Commits to branch (default branch if omitted). ' +
+      'Additive write; nothing is deleted.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        path: { type: 'string', description: 'File path within the repository' },
+        content: { type: 'string', description: 'New file content as plain UTF-8 text (replaces the file)' },
+        sha: {
+          type: 'string',
+          description: 'Current blob SHA of the file being replaced (from get_file_content); required by most Forgejo versions',
+        },
+        message: { type: 'string', description: 'Commit message' },
+        branch: { type: 'string', description: 'Branch to commit to (defaults to the repo default branch)' },
+      },
+      required: ['owner', 'repo', 'path', 'content'],
+    },
+    handler: (c, a) =>
+      c.updateFile(req(a, 'owner'), req(a, 'repo'), req(a, 'path'), {
+        content: Buffer.from(req<string>(a, 'content'), 'utf-8').toString('base64'),
+        sha: a.sha,
+        message: a.message,
+        branch: a.branch,
+      }),
+  },
+  {
     name: 'list_pull_requests',
     description: 'List repository pull requests, optionally filtered by state.',
     inputSchema: {

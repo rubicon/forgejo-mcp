@@ -7,8 +7,8 @@ import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 13 original + 6 release/tag tools (#21) = 19 base tools; elevated adds 2 more.
-const BASE_TOOLS = 19;
+// 19 (through v0.2.0) + 3 file tools (#35) = 22 base tools; elevated adds 2 more.
+const BASE_TOOLS = 22;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -17,6 +17,9 @@ const EXPECTED_NAMES = [
   'create_tag',
   'list_tags',
   'get_tag',
+  'list_directory',
+  'create_file',
+  'update_file',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -138,7 +141,7 @@ try {
     if (!has(on, name)) fail(`elevated: expected tool ${name} to be registered`);
   }
 
-  // Default surface must include the release/tag tools from #21.
+  // Default surface must include the expected additive tools (release/tag, file).
   const missing = EXPECTED_NAMES.filter((name) => !has(off, name));
   if (missing.length) fail(`default: missing expected tools: ${missing.join(', ')}`);
 

@@ -33,6 +33,9 @@ to the safe default described above.
 | `list_issue_comments` | read | Comments on an issue or PR |
 | `create_issue_comment` | write | Add a comment to an issue or PR |
 | `get_file_content` | read | Decoded file content (default branch if no ref) |
+| `list_directory` | read | List a directory's entries (root if no path) |
+| `create_file` | write | Create a file from plain-text content (optional new branch) |
+| `update_file` | write | Replace a file's content (pass `sha` to guard concurrent edits) |
 | `list_pull_requests` | read | List PRs; filter by state; paginated |
 | `get_pull_request` | read | A single PR with merge state |
 | `get_pull_request_diff` | read | Unified diff for a PR as plain text |
