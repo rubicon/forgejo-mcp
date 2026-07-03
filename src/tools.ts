@@ -514,6 +514,130 @@ export const tools: ToolDefinition[] = [
         message: a.message,
       }),
   },
+  {
+    name: 'list_pull_request_reviews',
+    description:
+      'List the reviews on a pull request (approvals, change requests, and review comments).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Pull request number' },
+      },
+      required: ['owner', 'repo', 'index'],
+    },
+    handler: (c, a) => c.listPullRequestReviews(req(a, 'owner'), req(a, 'repo'), req(a, 'index')),
+  },
+  {
+    name: 'create_pull_request_review',
+    description:
+      'Submit a review on a pull request. Additive write. event is one of APPROVE, ' +
+      'REQUEST_CHANGES, or COMMENT; body is the review comment (Markdown).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Pull request number' },
+        event: {
+          type: 'string',
+          enum: ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'],
+          description: 'Review verdict',
+        },
+        body: { type: 'string', description: 'Review comment (Markdown)' },
+      },
+      required: ['owner', 'repo', 'index', 'event'],
+    },
+    handler: (c, a) =>
+      c.createPullRequestReview(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
+        event: req(a, 'event'),
+        body: a.body,
+      }),
+  },
+  {
+    name: 'request_pull_request_reviewers',
+    description: 'Request reviews from one or more users on a pull request. Additive write.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Pull request number' },
+        reviewers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Usernames to request review from',
+        },
+        team_reviewers: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Team names to request review from (organization repos)',
+        },
+      },
+      required: ['owner', 'repo', 'index', 'reviewers'],
+    },
+    handler: (c, a) =>
+      c.requestPullRequestReviewers(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
+        reviewers: req(a, 'reviewers'),
+        team_reviewers: a.team_reviewers,
+      }),
+  },
+  {
+    name: 'list_labels',
+    description:
+      'List the labels defined in a repository (id, name, color). Use it to resolve label ' +
+      'names to the ids that add_labels expects. Paginated.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        ...pagination,
+      },
+      required: ['owner', 'repo'],
+    },
+    handler: (c, a) =>
+      c.listLabels(req(a, 'owner'), req(a, 'repo'), { page: a.page, limit: a.limit }),
+  },
+  {
+    name: 'add_labels',
+    description:
+      'Add labels to an issue or pull request (they share numbering). Additive write: ' +
+      'existing labels are kept. labels are label ids (see list_labels).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Issue or pull request number' },
+        labels: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Label ids to add (from list_labels)',
+        },
+      },
+      required: ['owner', 'repo', 'index', 'labels'],
+    },
+    handler: (c, a) =>
+      c.addLabels(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'labels')),
+  },
+  {
+    name: 'add_assignees',
+    description:
+      'Assign users to an issue or pull request (they share numbering). Additive write: ' +
+      'current assignees are preserved and the given usernames are added.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Issue or pull request number' },
+        assignees: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Usernames to add as assignees',
+        },
+      },
+      required: ['owner', 'repo', 'index', 'assignees'],
+    },
+    handler: (c, a) =>
+      c.addAssignees(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'assignees')),
+  },
 ];
 
 /**

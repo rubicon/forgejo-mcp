@@ -132,6 +132,20 @@ export interface PullRequest {
   updated_at: string;
 }
 
+/** A review on a pull request (an approval, change request, or comment). */
+export interface Review {
+  id: number;
+  body: string;
+  /** APPROVED, PENDING, REQUEST_CHANGES, COMMENT, or UNKNOWN. */
+  state: string;
+  html_url: string;
+  user: User;
+  commit_id?: string;
+  stale?: boolean;
+  official?: boolean;
+  submitted_at?: string;
+}
+
 export interface Commit {
   sha: string;
   html_url: string;
