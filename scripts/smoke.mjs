@@ -7,8 +7,8 @@ import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 19 (through v0.2.0) + 3 file tools (#35) = 22 base tools; elevated adds 2 more.
-const BASE_TOOLS = 22;
+// 22 (through #35) + 3 branch tools (#38) = 25 base tools; elevated adds 2 more.
+const BASE_TOOLS = 25;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -20,6 +20,9 @@ const EXPECTED_NAMES = [
   'list_directory',
   'create_file',
   'update_file',
+  'list_branches',
+  'get_branch',
+  'create_branch',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');

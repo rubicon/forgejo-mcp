@@ -41,6 +41,9 @@ to the safe default described above.
 | `get_pull_request_diff` | read | Unified diff for a PR as plain text |
 | `create_pull_request` | write | Open a PR from a head branch into a base branch |
 | `get_commit_status` | read | Combined CI/commit status for a ref |
+| `list_branches` | read | List branches with latest commit and protection status; paginated |
+| `get_branch` | read | A single branch by name |
+| `create_branch` | write | Create a branch from a source ref (default branch if none) |
 | `list_releases` | read | List releases; paginated |
 | `get_release` | read | A single release by ID, with notes and draft/prerelease flags |
 | `create_release` | write | Create a release for a tag (draft, prerelease, notes) |

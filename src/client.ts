@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Dax Davis / Rubicon TechVentures
 import type {
+  Branch,
   Comment,
   CommitStatus,
   ContentsResponse,
@@ -257,6 +258,28 @@ export class ForgejoClient {
 
   getCommitStatus(owner: string, repo: string, ref: string): Promise<CommitStatus> {
     return this.request(`${this.repoBase(owner, repo)}/commits/${ForgejoClient.seg(ref)}/status`);
+  }
+
+  listBranches(
+    owner: string,
+    repo: string,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<Branch[]> {
+    return this.request(`${this.repoBase(owner, repo)}/branches`, {
+      query: { page: opts.page, limit: opts.limit },
+    });
+  }
+
+  getBranch(owner: string, repo: string, branch: string): Promise<Branch> {
+    return this.request(`${this.repoBase(owner, repo)}/branches/${ForgejoClient.seg(branch)}`);
+  }
+
+  createBranch(
+    owner: string,
+    repo: string,
+    body: { new_branch_name: string; old_ref_name?: string },
+  ): Promise<Branch> {
+    return this.request(`${this.repoBase(owner, repo)}/branches`, { method: 'POST', body });
   }
 
   // --- Elevated (destructive) operations -----------------------------------

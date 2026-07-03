@@ -132,6 +132,14 @@ export interface PullRequest {
   updated_at: string;
 }
 
+export interface Branch {
+  name: string;
+  commit?: { id: string; message?: string };
+  protected: boolean;
+  user_can_push?: boolean;
+  user_can_merge?: boolean;
+}
+
 export interface CommitStatus {
   state: string;
   sha: string;
