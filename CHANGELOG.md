@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/rubicon/forgejo-mcp/compare/v0.2.0...v0.3.0) (2026-07-03)
+
+
+### Added
+
+* add branch tools (list_branches, get_branch, create_branch) ([#39](https://github.com/rubicon/forgejo-mcp/issues/39)) ([43edfc4](https://github.com/rubicon/forgejo-mcp/commit/43edfc4903942f01ba1c7722dda2ef7e23f80726)), closes [#38](https://github.com/rubicon/forgejo-mcp/issues/38)
+* add commit tools (list_commits, get_commit) ([#42](https://github.com/rubicon/forgejo-mcp/issues/42)) ([3bcae03](https://github.com/rubicon/forgejo-mcp/commit/3bcae03dfc9be3f55fa549d294588ca59aed371c)), closes [#40](https://github.com/rubicon/forgejo-mcp/issues/40)
+* add repository file tools (create_file, update_file, list_directory) ([#36](https://github.com/rubicon/forgejo-mcp/issues/36)) ([bde1e6f](https://github.com/rubicon/forgejo-mcp/commit/bde1e6fec88fcbc9eaaf755cafb87120e9999251)), closes [#35](https://github.com/rubicon/forgejo-mcp/issues/35)
+
+
+### Fixed
+
+* derive MCP handshake version from package.json at build time ([#45](https://github.com/rubicon/forgejo-mcp/issues/45)) ([d275bfe](https://github.com/rubicon/forgejo-mcp/commit/d275bfec201c6b0322ef197791d9b6bf2bd145af)), closes [#44](https://github.com/rubicon/forgejo-mcp/issues/44)
+
 ## [0.2.0](https://github.com/rubicon/forgejo-mcp/compare/v0.1.0...v0.2.0) (2026-07-03)
 
 
