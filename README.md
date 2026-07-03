@@ -52,6 +52,12 @@ to the safe default described above.
 | `list_tags` | read | List tags with their target commits; paginated |
 | `get_tag` | read | A single tag by name |
 | `create_tag` | write | Create a tag on a branch or commit (optionally annotated) |
+| `list_pull_request_reviews` | read | Reviews on a PR (approvals, change requests, comments) |
+| `create_pull_request_review` | write | Submit a review (`APPROVE`, `REQUEST_CHANGES`, or `COMMENT`) |
+| `request_pull_request_reviewers` | write | Request reviews from users (and org teams) on a PR |
+| `list_labels` | read | Labels defined in a repository (id, name, color); paginated |
+| `add_labels` | write | Add labels (by id) to an issue or PR; existing labels kept |
+| `add_assignees` | write | Assign users to an issue or PR; existing assignees kept |
 
 ## Configuration
 

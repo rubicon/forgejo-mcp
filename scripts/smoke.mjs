@@ -8,8 +8,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 25 (through #38) + 2 commit tools (#40) = 27 base tools; elevated adds 2 more.
-const BASE_TOOLS = 27;
+// 27 (through #42) + 6 PR reviews/metadata tools (#52) = 33 base tools; elevated
+// adds 2 more.
+const BASE_TOOLS = 33;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -26,6 +27,12 @@ const EXPECTED_NAMES = [
   'create_branch',
   'list_commits',
   'get_commit',
+  'list_pull_request_reviews',
+  'create_pull_request_review',
+  'request_pull_request_reviewers',
+  'list_labels',
+  'add_labels',
+  'add_assignees',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');

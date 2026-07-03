@@ -24,7 +24,7 @@ delete branch.**
 ```bash
 npm install
 npm run build      # esbuild -> dist/index.js (single bundled file)
-npm run smoke      # build + handshake; asserts BASE_TOOLS in scripts/smoke.mjs (currently 27) + version == package.json
+npm run smoke      # build + handshake; asserts BASE_TOOLS in scripts/smoke.mjs (currently 33) + version == package.json
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -36,7 +36,7 @@ in `src/index.ts`. Do not hardcode a version literal.
 
 See `ARCHITECTURE.md`. In brief: `src/index.ts` wires MCP over stdio;
 `src/client.ts` is the typed Forgejo REST client; `src/tools.ts` holds the tool
-definitions and handlers (27 base `tools` + 2 opt-in `elevatedTools`);
+definitions and handlers (33 base `tools` + 2 opt-in `elevatedTools`);
 `src/types.ts` has the API response shapes.
 esbuild bundles everything to a single `dist/index.js`. `scripts/smoke.mjs` is
 the only check.

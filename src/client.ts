@@ -11,11 +11,13 @@ import type {
   FileContent,
   ForgejoConfig,
   Issue,
+  Label,
   MergeResult,
   MergeStyle,
   PullRequest,
   Release,
   Repository,
+  Review,
   Tag,
 } from './types';
 
@@ -371,5 +373,68 @@ export class ForgejoClient {
     body: { tag_name: string; target?: string; message?: string },
   ): Promise<Tag> {
     return this.request(`${this.repoBase(owner, repo)}/tags`, { method: 'POST', body });
+  }
+
+  listPullRequestReviews(owner: string, repo: string, index: number): Promise<Review[]> {
+    return this.request(`${this.repoBase(owner, repo)}/pulls/${index}/reviews`);
+  }
+
+  createPullRequestReview(
+    owner: string,
+    repo: string,
+    index: number,
+    body: { event: string; body?: string },
+  ): Promise<Review> {
+    return this.request(`${this.repoBase(owner, repo)}/pulls/${index}/reviews`, {
+      method: 'POST',
+      body,
+    });
+  }
+
+  requestPullRequestReviewers(
+    owner: string,
+    repo: string,
+    index: number,
+    body: { reviewers: string[]; team_reviewers?: string[] },
+  ): Promise<Review[]> {
+    return this.request(`${this.repoBase(owner, repo)}/pulls/${index}/requested_reviewers`, {
+      method: 'POST',
+      body,
+    });
+  }
+
+  listLabels(
+    owner: string,
+    repo: string,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<Label[]> {
+    return this.request(`${this.repoBase(owner, repo)}/labels`, {
+      query: { page: opts.page, limit: opts.limit },
+    });
+  }
+
+  addLabels(owner: string, repo: string, index: number, labels: number[]): Promise<Label[]> {
+    return this.request(`${this.repoBase(owner, repo)}/issues/${index}/labels`, {
+      method: 'POST',
+      body: { labels },
+    });
+  }
+
+  // Additive: Forgejo has no add-assignee endpoint, and the issue-edit endpoint
+  // replaces the whole assignee list — so read the current assignees and merge
+  // the new ones in rather than clobbering them.
+  async addAssignees(
+    owner: string,
+    repo: string,
+    index: number,
+    assignees: string[],
+  ): Promise<Issue> {
+    const issue = await this.getIssue(owner, repo, index);
+    const current = (issue.assignees ?? []).map((user) => user.login);
+    const merged = Array.from(new Set([...current, ...assignees]));
+    return this.request(`${this.repoBase(owner, repo)}/issues/${index}`, {
+      method: 'PATCH',
+      body: { assignees: merged },
+    });
   }
 }
