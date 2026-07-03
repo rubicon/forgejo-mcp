@@ -4,6 +4,7 @@
 // list tools. Asserts the safe default surface AND that the opt-in elevated tier
 // is correctly double-gated across three env states. No Forgejo token required.
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,6 +29,8 @@ const EXPECTED_NAMES = [
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
+// The build inlines this into the handshake; assert the two never drift.
+const { version: PKG_VERSION } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
 function fail(message) {
   console.error(`SMOKE FAIL: ${message}`);
@@ -35,7 +38,7 @@ function fail(message) {
 }
 
 // Spawn the server with the given env, complete the handshake, and resolve with
-// the list of registered tool names.
+// the registered tool names plus the version advertised in the handshake.
 function listTools(env) {
   return new Promise((resolve, reject) => {
     const server = spawn('node', [serverPath], {
@@ -104,11 +107,14 @@ function listTools(env) {
           clientInfo: { name: 'smoke', version: '0.0.0' },
         },
       });
-      await waitFor(1);
+      const init = await waitFor(1);
       send({ jsonrpc: '2.0', method: 'notifications/initialized' });
       send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
       const result = await waitFor(2);
-      finish(null, (result?.tools ?? []).map((t) => t.name));
+      finish(null, {
+        names: (result?.tools ?? []).map((t) => t.name),
+        version: init?.serverInfo?.version,
+      });
     })().catch((error) => finish(error));
   });
 }
@@ -118,15 +124,20 @@ const hasElevated = (names) => ELEVATED_TOOLS.some((name) => has(names, name));
 
 try {
   // (a) No elevated env → safe default surface; elevated tools ABSENT.
-  const off = await listTools({
+  const { names: off, version: handshakeVersion } = await listTools({
     FORGEJO_MCP_ELEVATED: undefined,
     FORGEJO_MCP_ELEVATED_TOKEN: undefined,
   });
   if (off.length !== BASE_TOOLS) fail(`default: expected ${BASE_TOOLS} tools, got ${off.length}`);
   if (hasElevated(off)) fail('default: elevated tools must be absent with no elevated env');
 
+  // Handshake must advertise the package.json version (build-time injected).
+  if (handshakeVersion !== PKG_VERSION) {
+    fail(`version: handshake advertised ${handshakeVersion}, expected ${PKG_VERSION} from package.json`);
+  }
+
   // (b) Flag set but no elevated token → fail closed; elevated tools ABSENT.
-  const failClosed = await listTools({
+  const { names: failClosed } = await listTools({
     FORGEJO_MCP_ELEVATED: '1',
     FORGEJO_MCP_ELEVATED_TOKEN: undefined,
   });
@@ -136,7 +147,7 @@ try {
   if (hasElevated(failClosed)) fail('fail-closed: elevated tools must be absent without a token');
 
   // (c) Both flag and distinct token set → elevated tools PRESENT.
-  const on = await listTools({
+  const { names: on } = await listTools({
     FORGEJO_MCP_ELEVATED: '1',
     FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-elevated-token',
   });
@@ -151,8 +162,9 @@ try {
   if (missing.length) fail(`default: missing expected tools: ${missing.join(', ')}`);
 
   console.log(
-    `SMOKE OK: default=${off.length} tools, fail-closed=${failClosed.length}, ` +
-      `elevated=${on.length} (${ELEVATED_TOOLS.join(', ')}). Double gate verified.`,
+    `SMOKE OK: v${handshakeVersion}, default=${off.length} tools, ` +
+      `fail-closed=${failClosed.length}, elevated=${on.length} (${ELEVATED_TOOLS.join(', ')}). ` +
+      'Double gate + version verified.',
   );
   process.exit(0);
 } catch (error) {
