@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/rubicon/forgejo-mcp/compare/v0.3.0...v0.4.0) (2026-07-05)
+
+
+### Added
+
+* add PR reviews + metadata tools ([#53](https://github.com/rubicon/forgejo-mcp/issues/53)) ([4350bb2](https://github.com/rubicon/forgejo-mcp/commit/4350bb2480e69318d139e14b341ca7f27ee3cbd7)), closes [#52](https://github.com/rubicon/forgejo-mcp/issues/52)
+
 ## [0.3.0](https://github.com/rubicon/forgejo-mcp/compare/v0.2.0...v0.3.0) (2026-07-03)
 
 
