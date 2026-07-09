@@ -40,7 +40,7 @@ jobs:
       # satisfies `main`'s required-signed-commits rule (a PAT pushes unsigned bot
       # commits, which the branch protection rejects). The App token also triggers
       # CI, so required checks still run.
-      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         with:
           app-id: ${{ steps.op.outputs.RELEASE_PLEASE_APP_ID }}
