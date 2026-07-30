@@ -26,6 +26,12 @@ jobs:
       # the Automation vault). Only OP_SERVICE_ACCOUNT_TOKEN lives as a repo secret;
       # the app id + private key never leave 1Password, so the shared App key is
       # rotated in one place instead of fanned out across repos as secrets.
+      #
+      # The item is addressed by its UUID, not its title. Titles are mutable: this
+      # reference previously read "rubicon-release-please-private-key" and every
+      # release run started failing the moment the item was renamed. A UUID cannot
+      # drift that way. It identifies the rubicon-release-please GitHub App key and
+      # is an address, not a secret.
       - name: Load app credentials from 1Password
         id: op
         uses: 1password/load-secrets-action@3a12b0ab99d9cd590a3e9b5a90ea017210ed9556 # v4.0.1
@@ -33,8 +39,8 @@ jobs:
           export-env: false
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          RELEASE_PLEASE_APP_ID: 'op://Automation/rubicon-release-please-private-key/app id'
-          RELEASE_PLEASE_APP_KEY: 'op://Automation/rubicon-release-please-private-key/private key'
+          RELEASE_PLEASE_APP_ID: 'op://Automation/lnacky4l2tmlihrockbutkub7y/app id'
+          RELEASE_PLEASE_APP_KEY: 'op://Automation/lnacky4l2tmlihrockbutkub7y/private key'
       # Mint a token from the `rubicon-release-please` GitHub App. Commits authored
       # via an App token are auto-verified/signed by GitHub, so the release PR
       # satisfies `main`'s required-signed-commits rule (a PAT pushes unsigned bot
