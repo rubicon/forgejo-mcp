@@ -18,6 +18,8 @@ export interface MergeResult {
   merged: boolean;
   index: number;
   strategy: MergeStyle;
+  /** The head commit the merge was pinned to. */
+  head_commit_id: string;
 }
 
 export interface DeleteBranchResult {

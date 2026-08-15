@@ -317,18 +317,23 @@ export class ForgejoClient {
   // --- Elevated (destructive) operations -----------------------------------
   // These run under the elevated token only; see requestElevated above.
 
+  /**
+   * Merge a pull request. `head_commit_id` is sent as the API's own guard: the
+   * merge is refused if the branch head has moved since it was read, so an
+   * agent cannot merge commits that arrived after the review.
+   */
   async mergePullRequest(
     owner: string,
     repo: string,
     index: number,
-    opts: { style?: MergeStyle } = {},
+    opts: { style?: MergeStyle; head_commit_id: string },
   ): Promise<MergeResult> {
     const strategy = opts.style ?? 'merge';
     await this.requestElevated(`${this.repoBase(owner, repo)}/pulls/${index}/merge`, {
       method: 'POST',
-      body: { Do: strategy },
+      body: { Do: strategy, head_commit_id: opts.head_commit_id },
     });
-    return { merged: true, index, strategy };
+    return { merged: true, index, strategy, head_commit_id: opts.head_commit_id };
   }
 
   async deleteBranch(owner: string, repo: string, branch: string): Promise<DeleteBranchResult> {

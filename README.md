@@ -163,10 +163,15 @@ tier is **off by default** and must be deliberately enabled by the operator.
 
 | Tool | Kind | Operation |
 |------|------|-----------|
-| `merge_pull_request` | elevated | Merge a PR (`merge` / `rebase` / `squash`) into its base branch |
+| `merge_pull_request` | elevated | Merge a PR (`merge` / `rebase` / `squash`) into its base branch, pinned to a required `head_commit_id` |
 | `delete_branch` | elevated | Permanently delete a branch |
 
 Each elevated tool's description is prefixed with `[ELEVATED — DESTRUCTIVE]`.
+
+`merge_pull_request` **requires** `head_commit_id` — the head SHA from
+`get_pull_request`. Forgejo refuses the merge if the branch has moved since, so an
+agent cannot merge a pull request it never read, nor commits pushed after the
+review it acted on.
 
 ### Why it is gated so carefully
 
