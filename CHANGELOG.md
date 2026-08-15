@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/rubicon/forgejo-mcp/compare/v0.5.0...v0.6.0) (2026-08-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* **elevated:** merge_pull_request requires head_commit_id. Read it from get_pull_request (head.sha) before merging.
+
+### Added
+
+* **elevated:** pin merge_pull_request to a reviewed head SHA ([#73](https://github.com/rubicon/forgejo-mcp/issues/73)) ([861f593](https://github.com/rubicon/forgejo-mcp/commit/861f593e50c91d37024d31f119824c8a4dece72a)), closes [#70](https://github.com/rubicon/forgejo-mcp/issues/70)
+
 ## [0.5.0](https://github.com/rubicon/forgejo-mcp/compare/v0.4.0...v0.5.0) (2026-08-15)
 
 
