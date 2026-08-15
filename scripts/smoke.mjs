@@ -166,6 +166,9 @@ function startStubForgejo() {
   });
 
   return new Promise((resolve) => {
+    // A sandbox that forbids binding to loopback would otherwise surface as an
+    // unhandled error rather than a smoke failure.
+    server.on('error', (error) => fail(`stub: could not start the stub Forgejo: ${error.message}`));
     server.listen(0, '127.0.0.1', () => {
       resolve({
         url: `http://127.0.0.1:${server.address().port}`,
