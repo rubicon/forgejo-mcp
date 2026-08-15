@@ -30,7 +30,7 @@ to the safe default described above.
 | `list_issues` | read | List issues; filter by state, labels, and `type` (default `issues`); paginated |
 | `get_issue` | read | A single issue with body, labels, assignees |
 | `create_issue` | write | Open an issue (optional labels, assignees) |
-| `list_issue_comments` | read | Comments on an issue or PR |
+| `list_issue_comments` | read | Comments on an issue or PR; paginated |
 | `create_issue_comment` | write | Add a comment to an issue or PR |
 | `get_file_content` | read | Decoded file content (default branch if no ref) |
 | `list_directory` | read | List a directory's entries (root if no path) |
