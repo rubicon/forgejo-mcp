@@ -14,6 +14,17 @@ export interface ForgejoConfig {
 /** Merge strategy accepted by `merge_pull_request` (Forgejo `Do` field). */
 export type MergeStyle = 'merge' | 'rebase' | 'squash';
 
+/**
+ * One page of a list endpoint's results, with enough context to tell whether
+ * more exist. `total_count` is absent when the server does not report one.
+ */
+export interface Paginated<T> {
+  total_count?: number;
+  count: number;
+  page: number;
+  items: T[];
+}
+
 export interface MergeResult {
   merged: boolean;
   index: number;

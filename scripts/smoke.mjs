@@ -160,6 +160,13 @@ function startStubForgejo() {
     req.on('end', () => {
       const raw = Buffer.concat(chunks).toString('utf8');
       received.push({ method: req.method, url: req.url, body: raw ? JSON.parse(raw) : undefined });
+      // Reads answer with a short page out of a larger set, so the pagination
+      // metadata the list tools report has something to report.
+      if (req.method === 'GET') {
+        res.writeHead(200, { 'content-type': 'application/json', 'x-total-count': '51' });
+        res.end(JSON.stringify([{ id: 1 }, { id: 2 }]));
+        return;
+      }
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end('[]');
     });
@@ -243,6 +250,7 @@ function checkElevatedSchemas(tools) {
 // Drive real tools/call requests through the built server into a stub Forgejo,
 // then assert the requests it made.
 async function checkRequestContract() {
+  const payloads = new Map();
   const stub = await startStubForgejo();
   try {
     const rpc = await connect({
@@ -263,6 +271,7 @@ async function checkRequestContract() {
         if (result?.isError) {
           fail(`contract: ${name} returned an error: ${result.content?.[0]?.text ?? '(no text)'}`);
         }
+        payloads.set(name, JSON.parse(result.content[0].text));
       }
     } finally {
       rpc.close();
@@ -328,6 +337,29 @@ async function checkRequestContract() {
   if (merge.body?.Do !== 'squash') {
     fail(`contract: merge_pull_request must forward the style as Do, sent ${merge.body?.Do}`);
   }
+  // A list tool must say how much it did not return, or a caller cannot tell a
+  // complete answer from the first page of one.
+  const repoPage = payloads.get('list_repositories');
+  if (!Array.isArray(repoPage?.items)) {
+    fail('contract: list_repositories must return { items, ... }, not a bare array');
+  }
+  if (repoPage.total_count !== 51) {
+    fail(`contract: list_repositories must report the server's total, got ${repoPage.total_count}`);
+  }
+  if (repoPage.count !== 2 || repoPage.items.length !== 2) {
+    fail(`contract: list_repositories must report what it returned, got count=${repoPage.count}`);
+  }
+  if (repoPage.page !== 2) {
+    fail(`contract: list_repositories must echo the page it fetched, got ${repoPage.page}`);
+  }
+  const issuePage = payloads.get('list_issues');
+  if (issuePage?.page !== 1 || issuePage?.total_count !== 51) {
+    fail(
+      `contract: list_issues must report pagination too, got page=${issuePage?.page} ` +
+        `total_count=${issuePage?.total_count}`,
+    );
+  }
+
   if (merge.body?.head_commit_id !== 'feedface') {
     fail(
       'contract: merge_pull_request must forward head_commit_id so the merge is pinned to the ' +

@@ -59,6 +59,23 @@ to the safe default described above.
 | `add_labels` | write | Add labels (by id) to an issue or PR; existing labels kept |
 | `add_assignees` | write | Assign users to an issue or PR; existing assignees kept |
 
+### List results are paginated
+
+Every `list_*` tool except `list_directory` returns
+
+```json
+{ "total_count": 51, "count": 30, "page": 1, "items": [ … ] }
+```
+
+rather than a bare array. Forgejo serves list endpoints a page at a time and
+caps the page size regardless of the `limit` asked for, so a bare array cannot
+be told apart from the first slice of a much longer list. When `count` is short
+of `total_count`, ask for the next `page`. `total_count` is omitted when the
+server does not report one.
+
+`list_directory` is excluded because its endpoint answers with a single object,
+not a list, when the path names a file.
+
 ## Configuration
 
 Supply the target and token at runtime via environment variables:
