@@ -115,12 +115,11 @@ export class ForgejoClient {
    * tell a complete answer from the first page of a longer one.
    */
   private async requestPage<T>(path: string, query: Query = {}): Promise<Paginated<T>> {
-    this.ensureConfigured(this.token);
-
-    const response = await fetch(this.buildUrl(path, query), {
-      headers: { Authorization: `token ${this.token}`, Accept: 'application/json' },
-    });
-    if (!response.ok) throw await this.error('GET', path, response);
+    // Resolve the page once and use that same value for both the request and
+    // the reported metadata, so the answer can never name a page other than the
+    // one fetched.
+    const page = ForgejoClient.pageNumber(query.page);
+    const response = await this.requestRaw(path, { ...query, page });
 
     const text = await response.text();
     const items = (text ? JSON.parse(text) : []) as T[];
@@ -129,9 +128,28 @@ export class ForgejoClient {
     return {
       total_count: Number.isFinite(total) ? total : undefined,
       count: items.length,
-      page: Number(query.page) || 1,
+      page,
       items,
     };
+  }
+
+  /** Pages are 1-based; anything else is caller error, not something to fix up. */
+  private static pageNumber(value: QueryValue): number {
+    if (value === undefined) return 1;
+    const page = Number(value);
+    if (!Number.isInteger(page) || page < 1) {
+      throw new Error(`page must be a whole number of 1 or more, got ${value}`);
+    }
+    return page;
+  }
+
+  private async requestRaw(path: string, query: Query): Promise<Response> {
+    this.ensureConfigured(this.token);
+    const response = await fetch(this.buildUrl(path, query), {
+      headers: { Authorization: `token ${this.token}`, Accept: 'application/json' },
+    });
+    if (!response.ok) throw await this.error('GET', path, response);
+    return response;
   }
 
   private async requestText(path: string): Promise<string> {
@@ -434,8 +452,12 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     index: number,
+    opts: { page?: number; limit?: number } = {},
   ): Promise<Paginated<Review>> {
-    return this.requestPage(`${this.repoBase(owner, repo)}/pulls/${index}/reviews`);
+    return this.requestPage(`${this.repoBase(owner, repo)}/pulls/${index}/reviews`, {
+      page: opts.page,
+      limit: opts.limit,
+    });
   }
 
   createPullRequestReview(

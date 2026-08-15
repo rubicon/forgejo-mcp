@@ -266,12 +266,23 @@ async function checkRequestContract() {
         ['list_repositories', { page: 2, limit: 5 }],
         ['update_file', { owner: 'o', repo: 'r', path: 'docs/a.md', content: 'x', sha: 'abc123' }],
         ['create_pull_request_review', { owner: 'o', repo: 'r', index: 7, event: 'APPROVED' }],
+        ['list_pull_request_reviews', { owner: 'o', repo: 'r', index: 7, page: 3, limit: 4 }],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
         if (result?.isError) {
           fail(`contract: ${name} returned an error: ${result.content?.[0]?.text ?? '(no text)'}`);
         }
         payloads.set(name, JSON.parse(result.content[0].text));
+      }
+
+      // A page number the server cannot honour must be refused outright rather
+      // than sent and then reported back as some other page.
+      const badPage = await rpc.request('tools/call', {
+        name: 'list_repositories',
+        arguments: { page: 0 },
+      });
+      if (!badPage?.isError) {
+        fail('contract: a list tool must reject page=0 instead of reporting a different page');
       }
     } finally {
       rpc.close();
@@ -300,9 +311,26 @@ async function checkRequestContract() {
     await stub.close();
   }
 
-  const [issuesDefault, issuesAll, repos, update, review, merge] = stub.received;
   const parsed = (entry) => new URL(entry.url, 'http://stub');
   const query = (entry, key) => parsed(entry).searchParams.get(key);
+
+  // Select recorded requests by what they are rather than by position, so
+  // adding a call above does not silently re-point the assertions below.
+  const matching = (method, path) =>
+    stub.received.filter((entry) => entry.method === method && parsed(entry).pathname === path);
+  const only = (method, path) => {
+    const [first, ...rest] = matching(method, path);
+    if (!first) fail(`contract: no ${method} ${path} was requested`);
+    if (rest.length) fail(`contract: ${method} ${path} was requested ${rest.length + 1} times`);
+    return first;
+  };
+
+  const [issuesDefault, issuesAll] = matching('GET', '/api/v1/repos/o/r/issues');
+  const repos = only('GET', '/api/v1/user/repos');
+  const update = only('PUT', '/api/v1/repos/o/r/contents/docs/a.md');
+  const review = only('POST', '/api/v1/repos/o/r/pulls/7/reviews');
+  const reviewRequest = only('GET', '/api/v1/repos/o/r/pulls/7/reviews');
+  const merge = only('POST', '/api/v1/repos/o/r/pulls/9/merge');
 
   if (parsed(issuesDefault).pathname !== '/api/v1/repos/o/r/issues') {
     fail(`contract: list_issues hit ${parsed(issuesDefault).pathname}`);
@@ -352,6 +380,18 @@ async function checkRequestContract() {
   if (repoPage.page !== 2) {
     fail(`contract: list_repositories must echo the page it fetched, got ${repoPage.page}`);
   }
+  // Reporting a page a caller cannot ask for is the same defect in reverse.
+  const reviewPage = payloads.get('list_pull_request_reviews');
+  if (reviewPage?.page !== 3 || !Array.isArray(reviewPage?.items)) {
+    fail(`contract: list_pull_request_reviews must accept and report paging, got page=${reviewPage?.page}`);
+  }
+  if (query(reviewRequest, 'page') !== '3' || query(reviewRequest, 'limit') !== '4') {
+    fail(
+      `contract: list_pull_request_reviews must forward paging, sent ` +
+        `page=${query(reviewRequest, 'page')} limit=${query(reviewRequest, 'limit')}`,
+    );
+  }
+
   const issuePage = payloads.get('list_issues');
   if (issuePage?.page !== 1 || issuePage?.total_count !== 51) {
     fail(

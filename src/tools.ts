@@ -543,10 +543,15 @@ export const tools: ToolDefinition[] = [
       properties: {
         ...ownerRepo,
         index: { type: 'number', description: 'Pull request number' },
+        ...pagination,
       },
       required: ['owner', 'repo', 'index'],
     },
-    handler: (c, a) => c.listPullRequestReviews(req(a, 'owner'), req(a, 'repo'), req(a, 'index')),
+    handler: (c, a) =>
+      c.listPullRequestReviews(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
+        page: a.page,
+        limit: a.limit,
+      }),
   },
   {
     name: 'create_pull_request_review',
