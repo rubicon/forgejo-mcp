@@ -140,23 +140,35 @@ export class ForgejoClient {
     return `/repos/${ForgejoClient.seg(owner)}/${ForgejoClient.seg(repo)}`;
   }
 
-  listRepositories(username?: string): Promise<Repository[]> {
+  listRepositories(
+    username?: string,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<Repository[]> {
+    const query = { page: opts.page, limit: opts.limit };
     return username
-      ? this.request(`/users/${ForgejoClient.seg(username)}/repos`)
-      : this.request('/user/repos');
+      ? this.request(`/users/${ForgejoClient.seg(username)}/repos`, { query })
+      : this.request('/user/repos', { query });
   }
 
   getRepository(owner: string, repo: string): Promise<Repository> {
     return this.request(this.repoBase(owner, repo));
   }
 
+  // `type` narrows the endpoint, which otherwise returns pull requests alongside
+  // issues. 'all' means "send no filter", which is what asks the API for both.
   listIssues(
     owner: string,
     repo: string,
-    opts: { state?: string; labels?: string; page?: number; limit?: number } = {},
+    opts: { state?: string; labels?: string; type?: string; page?: number; limit?: number } = {},
   ): Promise<Issue[]> {
     return this.request(`${this.repoBase(owner, repo)}/issues`, {
-      query: { state: opts.state, labels: opts.labels, page: opts.page, limit: opts.limit },
+      query: {
+        state: opts.state,
+        labels: opts.labels,
+        type: opts.type === 'all' ? undefined : opts.type,
+        page: opts.page,
+        limit: opts.limit,
+      },
     });
   }
 
@@ -220,12 +232,15 @@ export class ForgejoClient {
     });
   }
 
-  /** Replace an existing file. `content` must already be base64-encoded. */
+  /**
+   * Replace an existing file. `content` must already be base64-encoded, and the
+   * API requires `sha` — the blob SHA of the file being replaced.
+   */
   updateFile(
     owner: string,
     repo: string,
     filepath: string,
-    body: { content: string; sha?: string; message?: string; branch?: string },
+    body: { content: string; sha: string; message?: string; branch?: string },
   ): Promise<FileChangeResponse> {
     return this.request(`${this.repoBase(owner, repo)}/contents/${ForgejoClient.filePath(filepath)}`, {
       method: 'PUT',

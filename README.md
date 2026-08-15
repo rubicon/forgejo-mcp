@@ -25,9 +25,9 @@ to the safe default described above.
 
 | Tool | Kind | Purpose |
 |------|------|---------|
-| `list_repositories` | read | List a user's repositories (default: authenticated user) |
+| `list_repositories` | read | List a user's repositories (default: authenticated user); paginated |
 | `get_repository` | read | Repository metadata, including default branch |
-| `list_issues` | read | List issues; filter by state and labels; paginated |
+| `list_issues` | read | List issues; filter by state, labels, and `type` (default `issues`); paginated |
 | `get_issue` | read | A single issue with body, labels, assignees |
 | `create_issue` | write | Open an issue (optional labels, assignees) |
 | `list_issue_comments` | read | Comments on an issue or PR |
@@ -35,7 +35,7 @@ to the safe default described above.
 | `get_file_content` | read | Decoded file content (default branch if no ref) |
 | `list_directory` | read | List a directory's entries (root if no path) |
 | `create_file` | write | Create a file from plain-text content (optional new branch) |
-| `update_file` | write | Replace a file's content (pass `sha` to guard concurrent edits) |
+| `update_file` | write | Replace a file's content (`sha` required — the blob SHA being replaced) |
 | `list_pull_requests` | read | List PRs; filter by state; paginated |
 | `get_pull_request` | read | A single PR with merge state |
 | `get_pull_request_diff` | read | Unified diff for a PR as plain text |
@@ -53,7 +53,7 @@ to the safe default described above.
 | `get_tag` | read | A single tag by name |
 | `create_tag` | write | Create a tag on a branch or commit (optionally annotated) |
 | `list_pull_request_reviews` | read | Reviews on a PR (approvals, change requests, comments) |
-| `create_pull_request_review` | write | Submit a review (`APPROVE`, `REQUEST_CHANGES`, or `COMMENT`) |
+| `create_pull_request_review` | write | Submit a review (`APPROVED`, `REQUEST_CHANGES`, or `COMMENT`) |
 | `request_pull_request_reviewers` | write | Request reviews from users (and org teams) on a PR |
 | `list_labels` | read | Labels defined in a repository (id, name, color); paginated |
 | `add_labels` | write | Add labels (by id) to an issue or PR; existing labels kept |

@@ -2,9 +2,13 @@
 // Copyright (c) 2026 Dax Davis / Rubicon TechVentures
 // Token-free smoke test: spawn the built server, complete an MCP handshake, and
 // list tools. Asserts the safe default surface AND that the opt-in elevated tier
-// is correctly double-gated across three env states. No Forgejo token required.
+// is correctly double-gated across three env states. Then re-spawns the server
+// against a local stub Forgejo and drives real tools/call requests, so the
+// request the client actually sends — path, query, body — is asserted rather
+// than just the schema it advertises. No Forgejo token required.
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -44,94 +48,252 @@ function fail(message) {
   process.exit(1);
 }
 
-// Spawn the server with the given env, complete the handshake, and resolve with
-// the registered tool names plus the version advertised in the handshake.
-function listTools(env) {
-  return new Promise((resolve, reject) => {
-    const server = spawn('node', [serverPath], {
-      stdio: ['pipe', 'pipe', 'inherit'],
-      env: { ...process.env, ...env },
-    });
+// Spawn the built server with the given env and speak JSON-RPC to it over stdio.
+// Resolves once the MCP handshake is complete; `close()` stops the server.
+function connect(env) {
+  const server = spawn('node', [serverPath], {
+    stdio: ['pipe', 'pipe', 'inherit'],
+    env: { ...process.env, ...env },
+  });
 
-    const pending = new Map();
-    let buffer = '';
-    let settled = false;
+  const pending = new Map();
+  let buffer = '';
+  let nextId = 1;
+  let closed = false;
 
-    const timeout = setTimeout(() => finish(new Error('timed out waiting for server')), 10_000);
+  function rejectAll(error) {
+    for (const { reject } of pending.values()) reject(error);
+    pending.clear();
+  }
 
-    function finish(error, value) {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      server.kill();
-      error ? reject(error) : resolve(value);
+  server.on('error', (error) => rejectAll(error));
+  server.on('exit', (code) => {
+    if (!closed && code !== null && code !== 0) {
+      rejectAll(new Error(`server exited early with code ${code}`));
     }
+  });
 
-    function send(message) {
-      server.stdin.write(`${JSON.stringify(message)}\n`);
-    }
-
-    function waitFor(id) {
-      return new Promise((res, rej) => pending.set(id, { resolve: res, reject: rej }));
-    }
-
-    server.on('error', (error) => finish(error));
-    server.on('exit', (code) => {
-      if (!settled && code !== null && code !== 0) {
-        finish(new Error(`server exited early with code ${code}`));
+  server.stdout.on('data', (chunk) => {
+    buffer += chunk.toString();
+    let newline;
+    while ((newline = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (!line) continue;
+      let message;
+      try {
+        message = JSON.parse(line);
+      } catch {
+        continue;
       }
-    });
-
-    server.stdout.on('data', (chunk) => {
-      buffer += chunk.toString();
-      let newline;
-      while ((newline = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (!line) continue;
-        let message;
-        try {
-          message = JSON.parse(line);
-        } catch {
-          continue;
-        }
-        if (message.id !== undefined && pending.has(message.id)) {
-          const { resolve: res, reject: rej } = pending.get(message.id);
-          pending.delete(message.id);
-          message.error ? rej(new Error(JSON.stringify(message.error))) : res(message.result);
-        }
+      if (message.id !== undefined && pending.has(message.id)) {
+        const { resolve, reject } = pending.get(message.id);
+        pending.delete(message.id);
+        message.error ? reject(new Error(JSON.stringify(message.error))) : resolve(message.result);
       }
-    });
+    }
+  });
 
-    (async () => {
-      send({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: {
-          protocolVersion: '2024-11-05',
-          capabilities: {},
-          clientInfo: { name: 'smoke', version: '0.0.0' },
+  function notify(method, params) {
+    server.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method, params })}\n`);
+  }
+
+  function request(method, params) {
+    const id = nextId++;
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`timed out waiting for ${method}`));
+      }, 10_000);
+      pending.set(id, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          reject(error);
         },
       });
-      const init = await waitFor(1);
-      send({ jsonrpc: '2.0', method: 'notifications/initialized' });
-      send({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
-      const result = await waitFor(2);
-      finish(null, {
-        names: (result?.tools ?? []).map((t) => t.name),
-        version: init?.serverInfo?.version,
+      server.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+    });
+  }
+
+  function close() {
+    closed = true;
+    server.kill();
+  }
+
+  return (async () => {
+    const init = await request('initialize', {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'smoke', version: '0.0.0' },
+    });
+    notify('notifications/initialized');
+    return { request, close, version: init?.serverInfo?.version };
+  })().catch((error) => {
+    close();
+    throw error;
+  });
+}
+
+// Complete a handshake and return the registered tools plus the advertised version.
+async function listTools(env) {
+  const rpc = await connect(env);
+  try {
+    const result = await rpc.request('tools/list', {});
+    const tools = result?.tools ?? [];
+    return { tools, names: tools.map((t) => t.name), version: rpc.version };
+  } finally {
+    rpc.close();
+  }
+}
+
+// A stand-in Forgejo that records every request the client makes and answers
+// with an empty JSON array, so handlers complete without a real instance.
+function startStubForgejo() {
+  const received = [];
+  const server = createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8');
+      received.push({ method: req.method, url: req.url, body: raw ? JSON.parse(raw) : undefined });
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('[]');
+    });
+  });
+
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => {
+      resolve({
+        url: `http://127.0.0.1:${server.address().port}`,
+        received,
+        close: () => new Promise((done) => server.close(done)),
       });
-    })().catch((error) => finish(error));
+    });
   });
 }
 
 const has = (names, name) => names.includes(name);
 const hasElevated = (names) => ELEVATED_TOOLS.some((name) => has(names, name));
 
+// --- Tool contract (see the tool-contract issue) -----------------------------
+// Both halves are needed: the schema is what the model is told, the recorded
+// request is what the client actually sends. A schema-only check passes while
+// the client silently drops a query parameter.
+
+function schemaOf(tools, name) {
+  const tool = tools.find((t) => t.name === name);
+  if (!tool) fail(`schema: tool ${name} is not registered`);
+  return tool.inputSchema ?? {};
+}
+
+function checkToolSchemas(tools) {
+  const review = schemaOf(tools, 'create_pull_request_review');
+  const event = review.properties?.event?.enum ?? [];
+  // Forgejo's ReviewStateType is APPROVED; APPROVE falls through its switch and
+  // silently files a pending draft review instead of an approval.
+  if (!event.includes('APPROVED')) {
+    fail(`schema: create_pull_request_review event enum must offer APPROVED, got [${event}]`);
+  }
+  if (event.includes('APPROVE')) {
+    fail('schema: create_pull_request_review event enum must not offer APPROVE (Forgejo ignores it)');
+  }
+
+  const issues = schemaOf(tools, 'list_issues');
+  const type = issues.properties?.type;
+  if (!type) fail('schema: list_issues must expose a type filter (its endpoint also returns PRs)');
+  if (type.default !== 'issues') {
+    fail(`schema: list_issues type must default to issues, got ${JSON.stringify(type.default)}`);
+  }
+  for (const value of ['issues', 'pulls', 'all']) {
+    if (!(type.enum ?? []).includes(value)) {
+      fail(`schema: list_issues type enum must include ${value}, got [${type.enum ?? []}]`);
+    }
+  }
+
+  const repos = schemaOf(tools, 'list_repositories');
+  for (const key of ['page', 'limit']) {
+    if (!repos.properties?.[key]) fail(`schema: list_repositories must expose ${key}`);
+  }
+
+  const update = schemaOf(tools, 'update_file');
+  if (!(update.required ?? []).includes('sha')) {
+    fail('schema: update_file must require sha (the API rejects an update without it)');
+  }
+}
+
+// Drive real tools/call requests through the built server into a stub Forgejo,
+// then assert the requests it made.
+async function checkRequestContract() {
+  const stub = await startStubForgejo();
+  try {
+    const rpc = await connect({
+      FORGEJO_BASE_URL: stub.url,
+      FORGEJO_TOKEN: 'smoke-stub-token',
+      FORGEJO_MCP_ELEVATED: undefined,
+      FORGEJO_MCP_ELEVATED_TOKEN: undefined,
+    });
+    try {
+      for (const [name, args] of [
+        ['list_issues', { owner: 'o', repo: 'r' }],
+        ['list_issues', { owner: 'o', repo: 'r', type: 'all' }],
+        ['list_repositories', { page: 2, limit: 5 }],
+        ['update_file', { owner: 'o', repo: 'r', path: 'docs/a.md', content: 'x', sha: 'abc123' }],
+        ['create_pull_request_review', { owner: 'o', repo: 'r', index: 7, event: 'APPROVED' }],
+      ]) {
+        const result = await rpc.request('tools/call', { name, arguments: args });
+        if (result?.isError) {
+          fail(`contract: ${name} returned an error: ${result.content?.[0]?.text ?? '(no text)'}`);
+        }
+      }
+    } finally {
+      rpc.close();
+    }
+  } finally {
+    await stub.close();
+  }
+
+  const [issuesDefault, issuesAll, repos, update, review] = stub.received;
+  const parsed = (entry) => new URL(entry.url, 'http://stub');
+  const query = (entry, key) => parsed(entry).searchParams.get(key);
+
+  if (parsed(issuesDefault).pathname !== '/api/v1/repos/o/r/issues') {
+    fail(`contract: list_issues hit ${parsed(issuesDefault).pathname}`);
+  }
+  if (query(issuesDefault, 'type') !== 'issues') {
+    fail(`contract: list_issues must send type=issues by default, sent ${query(issuesDefault, 'type')}`);
+  }
+  if (parsed(issuesAll).searchParams.has('type')) {
+    fail('contract: list_issues with type=all must omit the type parameter');
+  }
+  if (parsed(repos).pathname !== '/api/v1/user/repos') {
+    fail(`contract: list_repositories hit ${parsed(repos).pathname}`);
+  }
+  if (query(repos, 'page') !== '2' || query(repos, 'limit') !== '5') {
+    fail(
+      `contract: list_repositories must forward paging, sent page=${query(repos, 'page')} ` +
+        `limit=${query(repos, 'limit')}`,
+    );
+  }
+  if (update.method !== 'PUT' || update.body?.sha !== 'abc123') {
+    fail(`contract: update_file must PUT with the given sha, sent ${update.method} sha=${update.body?.sha}`);
+  }
+  if (update.body?.content !== Buffer.from('x', 'utf-8').toString('base64')) {
+    fail('contract: update_file must base64-encode the content it was given');
+  }
+  if (review.body?.event !== 'APPROVED') {
+    fail(`contract: create_pull_request_review must forward the event verbatim, sent ${review.body?.event}`);
+  }
+
+  return stub.received.length;
+}
+
 try {
   // (a) No elevated env → safe default surface; elevated tools ABSENT.
-  const { names: off, version: handshakeVersion } = await listTools({
+  const { names: off, tools: defaultTools, version: handshakeVersion } = await listTools({
     FORGEJO_MCP_ELEVATED: undefined,
     FORGEJO_MCP_ELEVATED_TOKEN: undefined,
   });
@@ -168,10 +330,14 @@ try {
   const missing = EXPECTED_NAMES.filter((name) => !has(off, name));
   if (missing.length) fail(`default: missing expected tools: ${missing.join(', ')}`);
 
+  // (d) Advertised schemas, then the requests the client actually sends.
+  checkToolSchemas(defaultTools);
+  const contractCalls = await checkRequestContract();
+
   console.log(
     `SMOKE OK: v${handshakeVersion}, default=${off.length} tools, ` +
       `fail-closed=${failClosed.length}, elevated=${on.length} (${ELEVATED_TOOLS.join(', ')}). ` +
-      'Double gate + version verified.',
+      `Double gate + version verified; ${contractCalls} tool calls verified against a stub Forgejo.`,
   );
   process.exit(0);
 } catch (error) {

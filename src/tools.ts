@@ -36,14 +36,17 @@ const stateEnum = {
 export const tools: ToolDefinition[] = [
   {
     name: 'list_repositories',
-    description: 'List repositories for a user. Omit username for the authenticated user.',
+    description:
+      'List repositories for a user. Omit username for the authenticated user. Paginated — ' +
+      'the server returns a bounded page, so pass page to reach the rest.',
     inputSchema: {
       type: 'object',
       properties: {
         username: { type: 'string', description: 'Username; omit for the authenticated user.' },
+        ...pagination,
       },
     },
-    handler: (c, a) => c.listRepositories(a.username),
+    handler: (c, a) => c.listRepositories(a.username, { page: a.page, limit: a.limit }),
   },
   {
     name: 'get_repository',
@@ -57,13 +60,22 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'list_issues',
-    description: 'List repository issues, optionally filtered by state and labels.',
+    description:
+      'List repository issues, optionally filtered by state and labels. Forgejo files ' +
+      'pull requests as issues, so this returns issues only unless type says otherwise; ' +
+      'use list_pull_requests for pull requests.',
     inputSchema: {
       type: 'object',
       properties: {
         ...ownerRepo,
         state: stateEnum,
         labels: { type: 'string', description: 'Comma-separated label names to filter by' },
+        type: {
+          type: 'string',
+          enum: ['issues', 'pulls', 'all'],
+          default: 'issues',
+          description: 'Which kind to return (default: issues); all returns both',
+        },
         ...pagination,
       },
       required: ['owner', 'repo'],
@@ -72,6 +84,7 @@ export const tools: ToolDefinition[] = [
       c.listIssues(req(a, 'owner'), req(a, 'repo'), {
         state: a.state,
         labels: a.labels,
+        type: a.type ?? 'issues',
         page: a.page,
         limit: a.limit,
       }),
@@ -220,9 +233,9 @@ export const tools: ToolDefinition[] = [
     name: 'update_file',
     description:
       'Update an existing file. content is plain UTF-8 text (base64-encoded for you) and ' +
-      'REPLACES the file. Pass sha (the current blob SHA from get_file_content) to guard ' +
-      'against overwriting concurrent changes. Commits to branch (default branch if omitted). ' +
-      'Additive write; nothing is deleted.',
+      'REPLACES the file. sha is the file\'s current blob SHA from get_file_content: the ' +
+      'API requires it, and it guards against overwriting concurrent changes. Commits to ' +
+      'branch (default branch if omitted). Additive write; nothing is deleted.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -231,17 +244,17 @@ export const tools: ToolDefinition[] = [
         content: { type: 'string', description: 'New file content as plain UTF-8 text (replaces the file)' },
         sha: {
           type: 'string',
-          description: 'Current blob SHA of the file being replaced (from get_file_content); required by most Forgejo versions',
+          description: 'Current blob SHA of the file being replaced (from get_file_content)',
         },
         message: { type: 'string', description: 'Commit message' },
         branch: { type: 'string', description: 'Branch to commit to (defaults to the repo default branch)' },
       },
-      required: ['owner', 'repo', 'path', 'content'],
+      required: ['owner', 'repo', 'path', 'content', 'sha'],
     },
     handler: (c, a) =>
       c.updateFile(req(a, 'owner'), req(a, 'repo'), req(a, 'path'), {
         content: Buffer.from(req<string>(a, 'content'), 'utf-8').toString('base64'),
-        sha: a.sha,
+        sha: req(a, 'sha'),
         message: a.message,
         branch: a.branch,
       }),
@@ -531,7 +544,7 @@ export const tools: ToolDefinition[] = [
   {
     name: 'create_pull_request_review',
     description:
-      'Submit a review on a pull request. Additive write. event is one of APPROVE, ' +
+      'Submit a review on a pull request. Additive write. event is one of APPROVED, ' +
       'REQUEST_CHANGES, or COMMENT; body is the review comment (Markdown).',
     inputSchema: {
       type: 'object',
@@ -540,7 +553,9 @@ export const tools: ToolDefinition[] = [
         index: { type: 'number', description: 'Pull request number' },
         event: {
           type: 'string',
-          enum: ['APPROVE', 'REQUEST_CHANGES', 'COMMENT'],
+          // Forgejo's ReviewStateType; anything outside it is treated as a
+          // pending draft review rather than rejected, so the value must match.
+          enum: ['APPROVED', 'REQUEST_CHANGES', 'COMMENT'],
           description: 'Review verdict',
         },
         body: { type: 'string', description: 'Review comment (Markdown)' },
