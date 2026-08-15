@@ -672,22 +672,31 @@ export const elevatedTools: ToolDefinition[] = [
     description:
       '[ELEVATED — DESTRUCTIVE] Merge a pull request into its base branch. This ' +
       'writes to the default branch and cannot be undone from here. Style is one ' +
-      'of merge (default), rebase, or squash.',
+      'of merge (default), rebase, or squash. head_commit_id pins the merge to the ' +
+      'commit you reviewed (take it from get_pull_request): if the branch has been ' +
+      'pushed to since, the merge fails instead of merging code nobody looked at.',
     inputSchema: {
       type: 'object',
       properties: {
         ...ownerRepo,
         index: { type: 'number', description: 'Pull request number' },
+        head_commit_id: {
+          type: 'string',
+          description: 'SHA of the head commit being merged (head.sha from get_pull_request)',
+        },
         style: {
           type: 'string',
           enum: ['merge', 'rebase', 'squash'],
           description: 'Merge strategy (default: merge)',
         },
       },
-      required: ['owner', 'repo', 'index'],
+      required: ['owner', 'repo', 'index', 'head_commit_id'],
     },
     handler: (c, a) =>
-      c.mergePullRequest(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), { style: a.style }),
+      c.mergePullRequest(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
+        style: a.style,
+        head_commit_id: req(a, 'head_commit_id'),
+      }),
   },
   {
     name: 'delete_branch',

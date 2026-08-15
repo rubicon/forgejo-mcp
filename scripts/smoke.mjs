@@ -228,6 +228,18 @@ function checkToolSchemas(tools) {
   }
 }
 
+function checkElevatedSchemas(tools) {
+  const merge = schemaOf(tools, 'merge_pull_request');
+  if (!merge.properties?.head_commit_id) {
+    fail('schema: merge_pull_request must expose head_commit_id');
+  }
+  // Requiring it means an elevated merge cannot run without naming the commit
+  // being merged, so a PR pushed to since review fails instead of merging.
+  if (!(merge.required ?? []).includes('head_commit_id')) {
+    fail('schema: merge_pull_request must require head_commit_id');
+  }
+}
+
 // Drive real tools/call requests through the built server into a stub Forgejo,
 // then assert the requests it made.
 async function checkRequestContract() {
@@ -255,11 +267,31 @@ async function checkRequestContract() {
     } finally {
       rpc.close();
     }
+
+    // The elevated tier needs its own connection: merge_pull_request is only
+    // registered when both gates are satisfied.
+    const elevated = await connect({
+      FORGEJO_BASE_URL: stub.url,
+      FORGEJO_TOKEN: 'smoke-stub-token',
+      FORGEJO_MCP_ELEVATED: '1',
+      FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-stub-elevated-token',
+    });
+    try {
+      const result = await elevated.request('tools/call', {
+        name: 'merge_pull_request',
+        arguments: { owner: 'o', repo: 'r', index: 9, style: 'squash', head_commit_id: 'feedface' },
+      });
+      if (result?.isError) {
+        fail(`contract: merge_pull_request returned an error: ${result.content?.[0]?.text ?? '(no text)'}`);
+      }
+    } finally {
+      elevated.close();
+    }
   } finally {
     await stub.close();
   }
 
-  const [issuesDefault, issuesAll, repos, update, review] = stub.received;
+  const [issuesDefault, issuesAll, repos, update, review, merge] = stub.received;
   const parsed = (entry) => new URL(entry.url, 'http://stub');
   const query = (entry, key) => parsed(entry).searchParams.get(key);
 
@@ -290,6 +322,18 @@ async function checkRequestContract() {
   if (review.body?.event !== 'APPROVED') {
     fail(`contract: create_pull_request_review must forward the event verbatim, sent ${review.body?.event}`);
   }
+  if (parsed(merge).pathname !== '/api/v1/repos/o/r/pulls/9/merge' || merge.method !== 'POST') {
+    fail(`contract: merge_pull_request hit ${merge.method} ${parsed(merge).pathname}`);
+  }
+  if (merge.body?.Do !== 'squash') {
+    fail(`contract: merge_pull_request must forward the style as Do, sent ${merge.body?.Do}`);
+  }
+  if (merge.body?.head_commit_id !== 'feedface') {
+    fail(
+      'contract: merge_pull_request must forward head_commit_id so the merge is pinned to the ' +
+        `reviewed head, sent ${merge.body?.head_commit_id}`,
+    );
+  }
 
   return stub.received.length;
 }
@@ -319,7 +363,7 @@ try {
   if (hasElevated(failClosed)) fail('fail-closed: elevated tools must be absent without a token');
 
   // (c) Both flag and distinct token set → elevated tools PRESENT.
-  const { names: on } = await listTools({
+  const { names: on, tools: elevatedSurface } = await listTools({
     FORGEJO_MCP_ELEVATED: '1',
     FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-elevated-token',
   });
@@ -335,6 +379,7 @@ try {
 
   // (d) Advertised schemas, then the requests the client actually sends.
   checkToolSchemas(defaultTools);
+  checkElevatedSchemas(elevatedSurface);
   const contractCalls = await checkRequestContract();
 
   console.log(
