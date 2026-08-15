@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/rubicon/forgejo-mcp/compare/v0.4.0...v0.5.0) (2026-08-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* list_issues returns issues only by default. Pass type: 'all' for the previous mixed issue-and-pull-request result.
+
+### Fixed
+
+* correct four tool-contract defects ([#71](https://github.com/rubicon/forgejo-mcp/issues/71)) ([d7826b6](https://github.com/rubicon/forgejo-mcp/commit/d7826b68c32b608eb3932393658a690ed2fc2951)), closes [#68](https://github.com/rubicon/forgejo-mcp/issues/68)
+
 ## [0.4.0](https://github.com/rubicon/forgejo-mcp/compare/v0.3.0...v0.4.0) (2026-07-30)
 
 
