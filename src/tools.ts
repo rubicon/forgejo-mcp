@@ -27,6 +27,13 @@ const pagination = {
   limit: { type: 'number', description: 'Results per page' },
 } as const;
 
+// Every list_* tool below (except list_directory, whose endpoint answers with a
+// single object for a file path) resolves to this shape rather than a bare
+// array, so a caller can see how much it did not receive.
+const PAGE_SHAPE =
+  ' Returns { total_count, count, page, items }; when count is short of ' +
+  'total_count, fetch the next page.';
+
 const stateEnum = {
   type: 'string',
   enum: ['open', 'closed', 'all'],
@@ -38,7 +45,7 @@ export const tools: ToolDefinition[] = [
     name: 'list_repositories',
     description:
       'List repositories for a user. Omit username for the authenticated user. Paginated — ' +
-      'the server returns a bounded page, so pass page to reach the rest.',
+      'the server returns a bounded page, so pass page to reach the rest.' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -63,7 +70,7 @@ export const tools: ToolDefinition[] = [
     description:
       'List repository issues, optionally filtered by state and labels. Forgejo files ' +
       'pull requests as issues, so this returns issues only unless type says otherwise; ' +
-      'use list_pull_requests for pull requests.',
+      'use list_pull_requests for pull requests.' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -134,7 +141,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'list_issue_comments',
-    description: 'List the comments on an issue or pull request (comments share one endpoint).',
+    description: 'List the comments on an issue or pull request (comments share one endpoint).' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -261,7 +268,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'list_pull_requests',
-    description: 'List repository pull requests, optionally filtered by state.',
+    description: 'List repository pull requests, optionally filtered by state.' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -342,7 +349,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'list_branches',
-    description: 'List repository branches with their latest commit and protection status; paginated.',
+    description: 'List repository branches with their latest commit and protection status; paginated.' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -371,7 +378,7 @@ export const tools: ToolDefinition[] = [
     name: 'list_commits',
     description:
       'List commits, newest first. sha selects the starting branch, tag, or commit ' +
-      '(defaults to the repo default branch); path limits to commits touching that file. Paginated.',
+      '(defaults to the repo default branch); path limits to commits touching that file. Paginated.' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -428,7 +435,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'list_releases',
-    description: 'List repository releases, newest first (includes drafts and prereleases).',
+    description: 'List repository releases, newest first (includes drafts and prereleases).' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -482,7 +489,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'list_tags',
-    description: 'List repository tags with their target commits.',
+    description: 'List repository tags with their target commits.' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -530,16 +537,21 @@ export const tools: ToolDefinition[] = [
   {
     name: 'list_pull_request_reviews',
     description:
-      'List the reviews on a pull request (approvals, change requests, and review comments).',
+      'List the reviews on a pull request (approvals, change requests, and review comments).' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
         ...ownerRepo,
         index: { type: 'number', description: 'Pull request number' },
+        ...pagination,
       },
       required: ['owner', 'repo', 'index'],
     },
-    handler: (c, a) => c.listPullRequestReviews(req(a, 'owner'), req(a, 'repo'), req(a, 'index')),
+    handler: (c, a) =>
+      c.listPullRequestReviews(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
+        page: a.page,
+        limit: a.limit,
+      }),
   },
   {
     name: 'create_pull_request_review',
@@ -599,7 +611,7 @@ export const tools: ToolDefinition[] = [
     name: 'list_labels',
     description:
       'List the labels defined in a repository (id, name, color). Use it to resolve label ' +
-      'names to the ids that add_labels expects. Paginated.',
+      'names to the ids that add_labels expects. Paginated.' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {

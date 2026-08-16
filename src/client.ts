@@ -14,6 +14,7 @@ import type {
   Label,
   MergeResult,
   MergeStyle,
+  Paginated,
   PullRequest,
   Release,
   Repository,
@@ -106,6 +107,51 @@ export class ForgejoClient {
     return this.request<T>(path, { ...options, token: this.elevatedToken });
   }
 
+  /**
+   * Perform a list request and report what came back alongside what exists.
+   *
+   * Forgejo answers list endpoints with a bounded page and puts the full size in
+   * `x-total-count`, which a bare array throws away — leaving a caller unable to
+   * tell a complete answer from the first page of a longer one.
+   */
+  private async requestPage<T>(path: string, query: Query = {}): Promise<Paginated<T>> {
+    // Resolve the page once and use that same value for both the request and
+    // the reported metadata, so the answer can never name a page other than the
+    // one fetched.
+    const page = ForgejoClient.pageNumber(query.page);
+    const response = await this.requestRaw(path, { ...query, page });
+
+    const text = await response.text();
+    const items = (text ? JSON.parse(text) : []) as T[];
+    const total = Number(response.headers.get('x-total-count'));
+
+    return {
+      total_count: Number.isFinite(total) ? total : undefined,
+      count: items.length,
+      page,
+      items,
+    };
+  }
+
+  /** Pages are 1-based; anything else is caller error, not something to fix up. */
+  private static pageNumber(value: QueryValue): number {
+    if (value === undefined) return 1;
+    const page = Number(value);
+    if (!Number.isInteger(page) || page < 1) {
+      throw new Error(`page must be a whole number of 1 or more, got ${value}`);
+    }
+    return page;
+  }
+
+  private async requestRaw(path: string, query: Query): Promise<Response> {
+    this.ensureConfigured(this.token);
+    const response = await fetch(this.buildUrl(path, query), {
+      headers: { Authorization: `token ${this.token}`, Accept: 'application/json' },
+    });
+    if (!response.ok) throw await this.error('GET', path, response);
+    return response;
+  }
+
   private async requestText(path: string): Promise<string> {
     this.ensureConfigured(this.token);
     const response = await fetch(this.buildUrl(path), {
@@ -143,11 +189,11 @@ export class ForgejoClient {
   listRepositories(
     username?: string,
     opts: { page?: number; limit?: number } = {},
-  ): Promise<Repository[]> {
+  ): Promise<Paginated<Repository>> {
     const query = { page: opts.page, limit: opts.limit };
     return username
-      ? this.request(`/users/${ForgejoClient.seg(username)}/repos`, { query })
-      : this.request('/user/repos', { query });
+      ? this.requestPage(`/users/${ForgejoClient.seg(username)}/repos`, query)
+      : this.requestPage('/user/repos', query);
   }
 
   getRepository(owner: string, repo: string): Promise<Repository> {
@@ -160,15 +206,13 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     opts: { state?: string; labels?: string; type?: string; page?: number; limit?: number } = {},
-  ): Promise<Issue[]> {
-    return this.request(`${this.repoBase(owner, repo)}/issues`, {
-      query: {
-        state: opts.state,
-        labels: opts.labels,
-        type: opts.type === 'all' ? undefined : opts.type,
-        page: opts.page,
-        limit: opts.limit,
-      },
+  ): Promise<Paginated<Issue>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/issues`, {
+      state: opts.state,
+      labels: opts.labels,
+      type: opts.type === 'all' ? undefined : opts.type,
+      page: opts.page,
+      limit: opts.limit,
     });
   }
 
@@ -189,9 +233,10 @@ export class ForgejoClient {
     repo: string,
     index: number,
     opts: { page?: number; limit?: number } = {},
-  ): Promise<Comment[]> {
-    return this.request(`${this.repoBase(owner, repo)}/issues/${index}/comments`, {
-      query: { page: opts.page, limit: opts.limit },
+  ): Promise<Paginated<Comment>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/issues/${index}/comments`, {
+      page: opts.page,
+      limit: opts.limit,
     });
   }
 
@@ -252,9 +297,11 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     opts: { state?: string; page?: number; limit?: number } = {},
-  ): Promise<PullRequest[]> {
-    return this.request(`${this.repoBase(owner, repo)}/pulls`, {
-      query: { state: opts.state, page: opts.page, limit: opts.limit },
+  ): Promise<Paginated<PullRequest>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/pulls`, {
+      state: opts.state,
+      page: opts.page,
+      limit: opts.limit,
     });
   }
 
@@ -282,9 +329,10 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     opts: { page?: number; limit?: number } = {},
-  ): Promise<Branch[]> {
-    return this.request(`${this.repoBase(owner, repo)}/branches`, {
-      query: { page: opts.page, limit: opts.limit },
+  ): Promise<Paginated<Branch>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/branches`, {
+      page: opts.page,
+      limit: opts.limit,
     });
   }
 
@@ -296,9 +344,12 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     opts: { sha?: string; path?: string; page?: number; limit?: number } = {},
-  ): Promise<Commit[]> {
-    return this.request(`${this.repoBase(owner, repo)}/commits`, {
-      query: { sha: opts.sha, path: opts.path, page: opts.page, limit: opts.limit },
+  ): Promise<Paginated<Commit>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/commits`, {
+      sha: opts.sha,
+      path: opts.path,
+      page: opts.page,
+      limit: opts.limit,
     });
   }
 
@@ -348,9 +399,10 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     opts: { page?: number; limit?: number } = {},
-  ): Promise<Release[]> {
-    return this.request(`${this.repoBase(owner, repo)}/releases`, {
-      query: { page: opts.page, limit: opts.limit },
+  ): Promise<Paginated<Release>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/releases`, {
+      page: opts.page,
+      limit: opts.limit,
     });
   }
 
@@ -377,9 +429,10 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     opts: { page?: number; limit?: number } = {},
-  ): Promise<Tag[]> {
-    return this.request(`${this.repoBase(owner, repo)}/tags`, {
-      query: { page: opts.page, limit: opts.limit },
+  ): Promise<Paginated<Tag>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/tags`, {
+      page: opts.page,
+      limit: opts.limit,
     });
   }
 
@@ -395,8 +448,16 @@ export class ForgejoClient {
     return this.request(`${this.repoBase(owner, repo)}/tags`, { method: 'POST', body });
   }
 
-  listPullRequestReviews(owner: string, repo: string, index: number): Promise<Review[]> {
-    return this.request(`${this.repoBase(owner, repo)}/pulls/${index}/reviews`);
+  listPullRequestReviews(
+    owner: string,
+    repo: string,
+    index: number,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<Paginated<Review>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/pulls/${index}/reviews`, {
+      page: opts.page,
+      limit: opts.limit,
+    });
   }
 
   createPullRequestReview(
@@ -427,9 +488,10 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     opts: { page?: number; limit?: number } = {},
-  ): Promise<Label[]> {
-    return this.request(`${this.repoBase(owner, repo)}/labels`, {
-      query: { page: opts.page, limit: opts.limit },
+  ): Promise<Paginated<Label>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/labels`, {
+      page: opts.page,
+      limit: opts.limit,
     });
   }
 

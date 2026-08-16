@@ -30,7 +30,7 @@ to the safe default described above.
 | `list_issues` | read | List issues; filter by state, labels, and `type` (default `issues`); paginated |
 | `get_issue` | read | A single issue with body, labels, assignees |
 | `create_issue` | write | Open an issue (optional labels, assignees) |
-| `list_issue_comments` | read | Comments on an issue or PR |
+| `list_issue_comments` | read | Comments on an issue or PR; paginated |
 | `create_issue_comment` | write | Add a comment to an issue or PR |
 | `get_file_content` | read | Decoded file content (default branch if no ref) |
 | `list_directory` | read | List a directory's entries (root if no path) |
@@ -52,12 +52,29 @@ to the safe default described above.
 | `list_tags` | read | List tags with their target commits; paginated |
 | `get_tag` | read | A single tag by name |
 | `create_tag` | write | Create a tag on a branch or commit (optionally annotated) |
-| `list_pull_request_reviews` | read | Reviews on a PR (approvals, change requests, comments) |
+| `list_pull_request_reviews` | read | Reviews on a PR (approvals, change requests, comments); paginated |
 | `create_pull_request_review` | write | Submit a review (`APPROVED`, `REQUEST_CHANGES`, or `COMMENT`) |
 | `request_pull_request_reviewers` | write | Request reviews from users (and org teams) on a PR |
 | `list_labels` | read | Labels defined in a repository (id, name, color); paginated |
 | `add_labels` | write | Add labels (by id) to an issue or PR; existing labels kept |
 | `add_assignees` | write | Assign users to an issue or PR; existing assignees kept |
+
+### List results are paginated
+
+Every `list_*` tool except `list_directory` returns
+
+```json
+{ "total_count": 51, "count": 30, "page": 1, "items": [ … ] }
+```
+
+rather than a bare array. Forgejo serves list endpoints a page at a time and
+caps the page size regardless of the `limit` asked for, so a bare array cannot
+be told apart from the first slice of a much longer list. When `count` is short
+of `total_count`, ask for the next `page`. `total_count` is omitted when the
+server does not report one.
+
+`list_directory` is excluded because its endpoint answers with a single object,
+not a list, when the path names a file.
 
 ## Configuration
 
