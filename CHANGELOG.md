@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0](https://github.com/rubicon/forgejo-mcp/compare/v0.6.0...v0.7.0) (2026-08-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* list tools return { total_count, count, page, items } instead of a bare array. Read the array from items.
+
+### Added
+
+* report pagination metadata from list tools ([#75](https://github.com/rubicon/forgejo-mcp/issues/75)) ([cc83cf7](https://github.com/rubicon/forgejo-mcp/commit/cc83cf7af6fcef939a53ec46f707e28f5da6543d))
+
 ## [0.6.0](https://github.com/rubicon/forgejo-mcp/compare/v0.5.0...v0.6.0) (2026-08-15)
 
 
