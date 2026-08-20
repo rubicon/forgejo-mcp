@@ -399,6 +399,19 @@ async function checkRequestContract() {
         fail(`contract: an omitted style must default to merge, sent ${defaulted?.body?.Do}`);
       }
 
+      // The other destructive tool. dev/88-slug is this repo's own branch naming,
+      // so an unencoded slash would address a different path entirely.
+      const deleted = await elevated.request('tools/call', {
+        name: 'delete_branch',
+        arguments: { owner: 'o', repo: 'r', branch: 'dev/88-remove-label' },
+      });
+      if (deleted?.isError) {
+        fail(`contract: delete_branch returned an error: ${deleted.content?.[0]?.text ?? '(no text)'}`);
+      }
+      if (JSON.parse(deleted.content[0].text)?.branch !== 'dev/88-remove-label') {
+        fail('contract: delete_branch must report the branch it deleted');
+      }
+
       // The destructive tier must refuse an unrecognised merge style rather than
       // let the API decide what it meant.
       const badStyle = await elevated.request('tools/call', {
@@ -473,6 +486,9 @@ async function checkRequestContract() {
   if (review.body?.event !== 'APPROVED') {
     fail(`contract: create_pull_request_review must forward the event verbatim, sent ${review.body?.event}`);
   }
+  const branchDelete = only('DELETE', '/api/v1/repos/o/r/branches/dev%2F88-remove-label');
+  if (!branchDelete) fail('contract: delete_branch must DELETE the encoded branch path');
+
   if (parsed(merge).pathname !== '/api/v1/repos/o/r/pulls/9/merge' || merge.method !== 'POST') {
     fail(`contract: merge_pull_request hit ${merge.method} ${parsed(merge).pathname}`);
   }
