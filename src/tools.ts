@@ -101,6 +101,16 @@ const ISSUE_TYPES = ['issues', 'pulls', 'all'] as const;
 const ISSUE_STATES = ['open', 'closed'] as const;
 const REVIEW_EVENTS = ['APPROVED', 'REQUEST_CHANGES', 'COMMENT'] as const;
 const MERGE_STYLES = ['merge', 'rebase', 'squash'] as const;
+// The two listing endpoints sort by different things; neither list is a subset
+// of the other, so they stay separate rather than being merged into one.
+const ISSUE_SORTS = [
+  'relevance', 'latest', 'oldest', 'recentupdate', 'leastupdate',
+  'mostcomment', 'leastcomment', 'nearduedate', 'farduedate',
+] as const;
+const PULL_SORTS = [
+  'oldest', 'recentupdate', 'recentclose', 'leastupdate',
+  'mostcomment', 'leastcomment', 'priority',
+] as const;
 
 const stateEnum = {
   type: 'string',
@@ -151,6 +161,21 @@ export const tools: ToolDefinition[] = [
           default: 'issues',
           description: 'Which kind to return (default: issues); all returns both',
         },
+        q: { type: 'string', description: 'Search string matched against title and body' },
+        milestones: {
+          type: 'string',
+          description: 'Comma-separated milestone names or ids (note: list_pull_requests takes a single id instead)',
+        },
+        since: { type: 'string', description: 'Only items updated after this RFC 3339 timestamp' },
+        before: { type: 'string', description: 'Only items updated before this RFC 3339 timestamp' },
+        created_by: { type: 'string', description: 'Only items created by this username' },
+        assigned_by: { type: 'string', description: 'Only items assigned to this username' },
+        mentioned_by: { type: 'string', description: 'Only items mentioning this username' },
+        sort: {
+          type: 'string',
+          enum: ISSUE_SORTS,
+          description: 'Sort order (these values differ from list_pull_requests)',
+        },
         ...pagination,
       },
       required: ['owner', 'repo'],
@@ -160,6 +185,14 @@ export const tools: ToolDefinition[] = [
         state: maybeOneOf(a, 'state', FILTER_STATES),
         labels: a.labels,
         type: maybeOneOf(a, 'type', ISSUE_TYPES) ?? 'issues',
+        q: a.q,
+        milestones: a.milestones,
+        since: a.since,
+        before: a.before,
+        created_by: a.created_by,
+        assigned_by: a.assigned_by,
+        mentioned_by: a.mentioned_by,
+        sort: maybeOneOf(a, 'sort', ISSUE_SORTS),
         page: a.page,
         limit: a.limit,
       }),
@@ -342,6 +375,21 @@ export const tools: ToolDefinition[] = [
       properties: {
         ...ownerRepo,
         state: stateEnum,
+        sort: {
+          type: 'string',
+          enum: PULL_SORTS,
+          description: 'Sort order (these values differ from list_issues)',
+        },
+        milestone: {
+          type: 'number',
+          description: 'Milestone id (note: list_issues takes comma-separated names or ids instead)',
+        },
+        labels: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Label ids (note: list_issues takes comma-separated label names instead)',
+        },
+        poster: { type: 'string', description: 'Only pull requests opened by this username' },
         ...pagination,
       },
       required: ['owner', 'repo'],
@@ -349,6 +397,10 @@ export const tools: ToolDefinition[] = [
     handler: (c, a) =>
       c.listPullRequests(req(a, 'owner'), req(a, 'repo'), {
         state: maybeOneOf(a, 'state', FILTER_STATES),
+        sort: maybeOneOf(a, 'sort', PULL_SORTS),
+        milestone: a.milestone,
+        labels: a.labels,
+        poster: a.poster,
         page: a.page,
         limit: a.limit,
       }),

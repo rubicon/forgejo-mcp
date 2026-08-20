@@ -25,7 +25,7 @@ import type {
   Tag,
 } from './types';
 
-type QueryValue = string | number | boolean | undefined;
+type QueryValue = string | number | boolean | undefined | ReadonlyArray<string | number>;
 type Query = Record<string, QueryValue>;
 
 interface RequestOptions {
@@ -68,7 +68,14 @@ export class ForgejoClient {
     const url = new URL(`${this.baseUrl}/api/v1${path}`);
     if (query) {
       for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined) url.searchParams.set(key, String(value));
+        if (value === undefined) continue;
+        // Forgejo declares its array parameters as collectionFormat: multi, so
+        // each element is its own parameter rather than one joined value.
+        if (Array.isArray(value)) {
+          for (const element of value) url.searchParams.append(key, String(element));
+          continue;
+        }
+        url.searchParams.set(key, String(value));
       }
     }
     return url.toString();
@@ -208,12 +215,34 @@ export class ForgejoClient {
   listIssues(
     owner: string,
     repo: string,
-    opts: { state?: string; labels?: string; type?: string; page?: number; limit?: number } = {},
+    opts: {
+      state?: string;
+      labels?: string;
+      type?: string;
+      q?: string;
+      milestones?: string;
+      since?: string;
+      before?: string;
+      created_by?: string;
+      assigned_by?: string;
+      mentioned_by?: string;
+      sort?: string;
+      page?: number;
+      limit?: number;
+    } = {},
   ): Promise<Paginated<Issue>> {
     return this.requestPage(`${this.repoBase(owner, repo)}/issues`, {
       state: opts.state,
       labels: opts.labels,
       type: opts.type === 'all' ? undefined : opts.type,
+      q: opts.q,
+      milestones: opts.milestones,
+      since: opts.since,
+      before: opts.before,
+      created_by: opts.created_by,
+      assigned_by: opts.assigned_by,
+      mentioned_by: opts.mentioned_by,
+      sort: opts.sort,
       page: opts.page,
       limit: opts.limit,
     });
@@ -299,10 +328,22 @@ export class ForgejoClient {
   listPullRequests(
     owner: string,
     repo: string,
-    opts: { state?: string; page?: number; limit?: number } = {},
+    opts: {
+      state?: string;
+      sort?: string;
+      milestone?: number;
+      labels?: ReadonlyArray<string | number>;
+      poster?: string;
+      page?: number;
+      limit?: number;
+    } = {},
   ): Promise<Paginated<PullRequest>> {
     return this.requestPage(`${this.repoBase(owner, repo)}/pulls`, {
       state: opts.state,
+      sort: opts.sort,
+      milestone: opts.milestone,
+      labels: opts.labels,
+      poster: opts.poster,
       page: opts.page,
       limit: opts.limit,
     });
