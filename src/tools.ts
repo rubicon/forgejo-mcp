@@ -783,6 +783,24 @@ export const tools: ToolDefinition[] = [
       ),
   },
   {
+    name: 'remove_label',
+    description:
+      'Remove one label from an issue or pull request (they share numbering). label is ' +
+      'a label name or id, so list_labels is optional. Removes one per call; use ' +
+      'add_labels to put labels back.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Issue or pull request number' },
+        label: { type: 'string', description: 'Label name or id to remove' },
+      },
+      required: ['owner', 'repo', 'index', 'label'],
+    },
+    handler: (c, a) =>
+      c.removeLabel(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'label')),
+  },
+  {
     name: 'add_assignees',
     description:
       'Assign users to an issue or pull request (they share numbering). Additive write: ' +

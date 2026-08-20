@@ -13,8 +13,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
-// + get_pull_request_files (#85) = 35 base tools; elevated adds 2 more.
-const BASE_TOOLS = 35;
+// + get_pull_request_files (#85) + remove_label (#88) = 36 base tools; elevated
+// adds 2 more.
+const BASE_TOOLS = 36;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -39,6 +40,7 @@ const EXPECTED_NAMES = [
   'add_assignees',
   'set_issue_state',
   'get_pull_request_files',
+  'remove_label',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -291,6 +293,8 @@ async function checkRequestContract() {
         ],
         ['list_pull_request_reviews', { owner: 'o', repo: 'r', index: 7, page: 3, limit: 4 }],
         ['get_pull_request_files', { owner: 'o', repo: 'r', index: 21, page: 2, limit: 7 }],
+        // A label name may contain characters that must not corrupt the URL.
+        ['remove_label', { owner: 'o', repo: 'r', index: 31, label: 'needs triage/urgent' }],
         ['set_issue_state', { owner: 'o', repo: 'r', index: 12, state: 'closed' }],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
@@ -524,6 +528,9 @@ async function checkRequestContract() {
   if (!Array.isArray(filePage?.items) || filePage?.page !== 2 || filePage?.total_count !== 51) {
     fail(`contract: get_pull_request_files must return the paginated envelope, got ${JSON.stringify(filePage)}`);
   }
+
+  const removed = only('DELETE', '/api/v1/repos/o/r/issues/31/labels/needs%20triage%2Furgent');
+  if (!removed) fail('contract: remove_label must DELETE the encoded identifier path');
 
   const issuePage = payloads.get('list_issues');
   if (issuePage?.page !== 1 || issuePage?.total_count !== 51) {

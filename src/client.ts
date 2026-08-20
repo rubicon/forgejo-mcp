@@ -18,6 +18,7 @@ import type {
   Paginated,
   PullRequest,
   Release,
+  RemoveLabelResult,
   Repository,
   Review,
   ReviewComment,
@@ -507,6 +508,23 @@ export class ForgejoClient {
       page: opts.page,
       limit: opts.limit,
     });
+  }
+
+  /**
+   * Remove one label. `identifier` is a label name or id, and names can contain
+   * spaces and slashes, so it is encoded as a single path segment.
+   */
+  async removeLabel(
+    owner: string,
+    repo: string,
+    index: number,
+    label: string,
+  ): Promise<RemoveLabelResult> {
+    await this.request(
+      `${this.repoBase(owner, repo)}/issues/${index}/labels/${ForgejoClient.seg(label)}`,
+      { method: 'DELETE' },
+    );
+    return { removed: true, index, label };
   }
 
   addLabels(owner: string, repo: string, index: number, labels: number[]): Promise<Label[]> {
