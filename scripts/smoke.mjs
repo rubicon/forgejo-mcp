@@ -281,7 +281,13 @@ async function checkRequestContract() {
         ['list_issues', { owner: 'o', repo: 'r', type: 'all' }],
         ['list_repositories', { page: 2, limit: 5 }],
         ['update_file', { owner: 'o', repo: 'r', path: 'docs/a.md', content: 'x', sha: 'abc123' }],
-        ['create_pull_request_review', { owner: 'o', repo: 'r', index: 7, event: 'APPROVED' }],
+        [
+          'create_pull_request_review',
+          {
+            owner: 'o', repo: 'r', index: 7, event: 'APPROVED', commit_id: 'cafebabe',
+            comments: [{ path: 'src/a.ts', body: 'off by one', new_position: 12 }],
+          },
+        ],
         ['list_pull_request_reviews', { owner: 'o', repo: 'r', index: 7, page: 3, limit: 4 }],
         ['set_issue_state', { owner: 'o', repo: 'r', index: 12, state: 'closed' }],
       ]) {
@@ -312,6 +318,24 @@ async function checkRequestContract() {
         }
         if (stub.received.some((entry) => entry.url.includes(marker))) {
           fail(`contract: ${name} must not send an out-of-enum value to the API`);
+        }
+      }
+
+      // A comment with no path anchors to nothing; Forgejo would accept the
+      // request and quietly file a degraded review, so refuse it here.
+      for (const bad of [
+        { path: '', body: 'nowhere' },
+        { path: 'src/a.ts', body: '' },
+      ]) {
+        const rejected = await rpc.request('tools/call', {
+          name: 'create_pull_request_review',
+          arguments: { owner: 'bad', repo: 'comment', index: 8, event: 'COMMENT', comments: [bad] },
+        });
+        if (!rejected?.isError) {
+          fail(`contract: create_pull_request_review must reject ${JSON.stringify(bad)}`);
+        }
+        if (stub.received.some((entry) => entry.url.includes('/repos/bad/comment'))) {
+          fail('contract: an invalid inline comment must not reach the API');
         }
       }
 
@@ -425,6 +449,13 @@ async function checkRequestContract() {
   }
   if (update.body?.content !== Buffer.from('x', 'utf-8').toString('base64')) {
     fail('contract: update_file must base64-encode the content it was given');
+  }
+  if (review.body?.commit_id !== 'cafebabe') {
+    fail(`contract: create_pull_request_review must forward commit_id, sent ${review.body?.commit_id}`);
+  }
+  const inline = review.body?.comments?.[0];
+  if (inline?.path !== 'src/a.ts' || inline?.body !== 'off by one' || inline?.new_position !== 12) {
+    fail(`contract: inline comments must be forwarded verbatim, sent ${JSON.stringify(review.body?.comments)}`);
   }
   if (review.body?.event !== 'APPROVED') {
     fail(`contract: create_pull_request_review must forward the event verbatim, sent ${review.body?.event}`);

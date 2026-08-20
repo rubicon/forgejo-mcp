@@ -145,6 +145,14 @@ export interface PullRequest {
   updated_at: string;
 }
 
+/** An inline comment on a pull request review, anchored to a file and line. */
+export interface ReviewComment {
+  path: string;
+  body: string;
+  new_position?: number;
+  old_position?: number;
+}
+
 /** A review on a pull request (an approval, change request, or comment). */
 export interface Review {
   id: number;

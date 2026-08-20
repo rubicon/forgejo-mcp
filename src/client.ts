@@ -19,6 +19,7 @@ import type {
   Release,
   Repository,
   Review,
+  ReviewComment,
   Tag,
 } from './types';
 
@@ -464,7 +465,7 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     index: number,
-    body: { event: string; body?: string },
+    body: { event: string; body?: string; commit_id?: string; comments?: ReviewComment[] },
   ): Promise<Review> {
     return this.request(`${this.repoBase(owner, repo)}/pulls/${index}/reviews`, {
       method: 'POST',

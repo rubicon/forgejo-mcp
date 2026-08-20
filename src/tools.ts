@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 Dax Davis / Rubicon TechVentures
 import type { ForgejoClient } from './client';
+import type { ReviewComment } from './types';
 
 export interface ToolDefinition {
   name: string;
@@ -46,6 +47,28 @@ function maybeOneOf<T extends string>(
   const value = args?.[key];
   if (value === undefined || value === null || value === '') return undefined;
   return oneOf(args, key, allowed);
+}
+
+/**
+ * Check inline review comments before they are sent.
+ *
+ * A comment with no path anchors to nothing and one with no body says nothing;
+ * Forgejo accepts either and files a degraded review with a success response,
+ * which is the failure mode that hides best.
+ */
+function reviewComments(value: unknown): ReviewComment[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) throw new Error('comments must be an array');
+  return value.map((comment, index) => {
+    const { path, body, new_position, old_position } = (comment ?? {}) as Record<string, unknown>;
+    if (typeof path !== 'string' || path === '') {
+      throw new Error(`comments[${index}].path is required`);
+    }
+    if (typeof body !== 'string' || body === '') {
+      throw new Error(`comments[${index}].body is required`);
+    }
+    return { path, body, new_position, old_position } as ReviewComment;
+  });
 }
 
 const ownerRepo = {
@@ -608,6 +631,26 @@ export const tools: ToolDefinition[] = [
           description: 'Review verdict',
         },
         body: { type: 'string', description: 'Review comment (Markdown)' },
+        commit_id: {
+          type: 'string',
+          description:
+            'SHA the review is against (head.sha from get_pull_request), so the comments ' +
+            'anchor to the diff that was read',
+        },
+        comments: {
+          type: 'array',
+          description: 'Inline comments, each anchored to a file and line',
+          items: {
+            type: 'object',
+            properties: {
+              path: { type: 'string', description: 'File path the comment is on' },
+              body: { type: 'string', description: 'Comment text (Markdown)' },
+              new_position: { type: 'number', description: 'Line number in the new file' },
+              old_position: { type: 'number', description: 'Line number in the old file' },
+            },
+            required: ['path', 'body'],
+          },
+        },
       },
       required: ['owner', 'repo', 'index', 'event'],
     },
@@ -615,6 +658,8 @@ export const tools: ToolDefinition[] = [
       c.createPullRequestReview(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         event: oneOf(a, 'event', REVIEW_EVENTS),
         body: a.body,
+        commit_id: a.commit_id,
+        comments: reviewComments(a.comments),
       }),
   },
   {
