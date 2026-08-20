@@ -399,7 +399,7 @@ export const tools: ToolDefinition[] = [
         state: maybeOneOf(a, 'state', FILTER_STATES),
         sort: maybeOneOf(a, 'sort', PULL_SORTS),
         milestone: a.milestone,
-        labels: Array.isArray(a.labels) ? a.labels.join(',') : a.labels,
+        labels: a.labels,
         poster: a.poster,
         page: a.page,
         limit: a.limit,

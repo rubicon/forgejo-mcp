@@ -25,7 +25,7 @@ import type {
   Tag,
 } from './types';
 
-type QueryValue = string | number | boolean | undefined;
+type QueryValue = string | number | boolean | undefined | ReadonlyArray<string | number>;
 type Query = Record<string, QueryValue>;
 
 interface RequestOptions {
@@ -68,7 +68,14 @@ export class ForgejoClient {
     const url = new URL(`${this.baseUrl}/api/v1${path}`);
     if (query) {
       for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined) url.searchParams.set(key, String(value));
+        if (value === undefined) continue;
+        // Forgejo declares its array parameters as collectionFormat: multi, so
+        // each element is its own parameter rather than one joined value.
+        if (Array.isArray(value)) {
+          for (const element of value) url.searchParams.append(key, String(element));
+          continue;
+        }
+        url.searchParams.set(key, String(value));
       }
     }
     return url.toString();
@@ -325,7 +332,7 @@ export class ForgejoClient {
       state?: string;
       sort?: string;
       milestone?: number;
-      labels?: string;
+      labels?: ReadonlyArray<string | number>;
       poster?: string;
       page?: number;
       limit?: number;

@@ -575,10 +575,16 @@ async function checkRequestContract() {
     }
   }
   const prFiltered = only('GET', '/api/v1/repos/f/prfilter/pulls');
-  for (const [key, want] of [['sort', 'priority'], ['milestone', '4'], ['poster', 'dax'], ['labels', '7,9']]) {
+  for (const [key, want] of [['sort', 'priority'], ['milestone', '4'], ['poster', 'dax']]) {
     if (query(prFiltered, key) !== want) {
       fail(`contract: list_pull_requests must forward ${key}=${want}, sent ${query(prFiltered, key)}`);
     }
+  }
+  // The endpoint declares labels as collectionFormat: multi, so each id is its
+  // own parameter. Comma-joining sends one value the server cannot parse as an id.
+  const labelIds = parsed(prFiltered).searchParams.getAll('labels');
+  if (labelIds.join('|') !== '7|9') {
+    fail(`contract: list_pull_requests must repeat labels per id, sent ${JSON.stringify(labelIds)}`);
   }
 
   const issuePage = payloads.get('list_issues');
