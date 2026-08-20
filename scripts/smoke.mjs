@@ -12,9 +12,9 @@ import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 27 (through #42) + 6 PR reviews/metadata tools (#52) = 33 base tools; elevated
-// adds 2 more.
-const BASE_TOOLS = 33;
+// 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
+// = 34 base tools; elevated adds 2 more.
+const BASE_TOOLS = 34;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -37,6 +37,7 @@ const EXPECTED_NAMES = [
   'list_labels',
   'add_labels',
   'add_assignees',
+  'set_issue_state',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -229,6 +230,21 @@ function checkToolSchemas(tools) {
     if (!repos.properties?.[key]) fail(`schema: list_repositories must expose ${key}`);
   }
 
+  const issueState = schemaOf(tools, 'set_issue_state');
+  const state = issueState.properties?.state;
+  if (!state) fail('schema: set_issue_state must expose state');
+  const states = (state.enum ?? []).slice().sort();
+  // Only the two reachable states: PATCH also accepts title and body, which are
+  // deliberately out of this tool's reach.
+  if (states.join(',') !== 'closed,open') {
+    fail(`schema: set_issue_state state enum must be exactly open|closed, got [${state.enum ?? []}]`);
+  }
+  for (const key of ['title', 'body']) {
+    if (issueState.properties?.[key]) {
+      fail(`schema: set_issue_state must not expose ${key} — content edits are out of scope`);
+    }
+  }
+
   const update = schemaOf(tools, 'update_file');
   if (!(update.required ?? []).includes('sha')) {
     fail('schema: update_file must require sha (the API rejects an update without it)');
@@ -267,6 +283,7 @@ async function checkRequestContract() {
         ['update_file', { owner: 'o', repo: 'r', path: 'docs/a.md', content: 'x', sha: 'abc123' }],
         ['create_pull_request_review', { owner: 'o', repo: 'r', index: 7, event: 'APPROVED' }],
         ['list_pull_request_reviews', { owner: 'o', repo: 'r', index: 7, page: 3, limit: 4 }],
+        ['set_issue_state', { owner: 'o', repo: 'r', index: 12, state: 'closed' }],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
         if (result?.isError) {
@@ -389,6 +406,17 @@ async function checkRequestContract() {
     fail(
       `contract: list_pull_request_reviews must forward paging, sent ` +
         `page=${query(reviewRequest, 'page')} limit=${query(reviewRequest, 'limit')}`,
+    );
+  }
+
+  const issueState = only('PATCH', '/api/v1/repos/o/r/issues/12');
+  if (issueState.body?.state !== 'closed') {
+    fail(`contract: set_issue_state must PATCH the state, sent ${JSON.stringify(issueState.body)}`);
+  }
+  if (Object.keys(issueState.body ?? {}).join(',') !== 'state') {
+    fail(
+      'contract: set_issue_state must send state and nothing else, sent ' +
+        Object.keys(issueState.body ?? {}).join(','),
     );
   }
 

@@ -58,6 +58,7 @@ to the safe default described above.
 | `list_labels` | read | Labels defined in a repository (id, name, color); paginated |
 | `add_labels` | write | Add labels (by id) to an issue or PR; existing labels kept |
 | `add_assignees` | write | Assign users to an issue or PR; existing assignees kept |
+| `set_issue_state` | write | Close or reopen an issue or PR (state only — no title/body edits) |
 
 ### List results are paginated
 
