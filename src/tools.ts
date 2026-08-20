@@ -380,6 +380,27 @@ export const tools: ToolDefinition[] = [
     handler: (c, a) => c.getPullRequestDiff(req(a, 'owner'), req(a, 'repo'), req(a, 'index')),
   },
   {
+    name: 'get_pull_request_files',
+    description:
+      'List the files a pull request changes, with per-file status and line counts. ' +
+      'Use it to find what to review before commenting, rather than parsing the whole ' +
+      'diff from get_pull_request_diff.' + PAGE_SHAPE,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Pull request number' },
+        ...pagination,
+      },
+      required: ['owner', 'repo', 'index'],
+    },
+    handler: (c, a) =>
+      c.listPullRequestFiles(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
+        page: a.page,
+        limit: a.limit,
+      }),
+  },
+  {
     name: 'create_pull_request',
     description: 'Open a new pull request from a head branch into a base branch.',
     inputSchema: {

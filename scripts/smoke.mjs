@@ -13,8 +13,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
-// = 34 base tools; elevated adds 2 more.
-const BASE_TOOLS = 34;
+// + get_pull_request_files (#85) = 35 base tools; elevated adds 2 more.
+const BASE_TOOLS = 35;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -38,6 +38,7 @@ const EXPECTED_NAMES = [
   'add_labels',
   'add_assignees',
   'set_issue_state',
+  'get_pull_request_files',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -289,6 +290,7 @@ async function checkRequestContract() {
           },
         ],
         ['list_pull_request_reviews', { owner: 'o', repo: 'r', index: 7, page: 3, limit: 4 }],
+        ['get_pull_request_files', { owner: 'o', repo: 'r', index: 21, page: 2, limit: 7 }],
         ['set_issue_state', { owner: 'o', repo: 'r', index: 12, state: 'closed' }],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
@@ -505,6 +507,18 @@ async function checkRequestContract() {
       'contract: set_issue_state must send state and nothing else, sent ' +
         Object.keys(issueState.body ?? {}).join(','),
     );
+  }
+
+  const files = only('GET', '/api/v1/repos/o/r/pulls/21/files');
+  if (query(files, 'page') !== '2' || query(files, 'limit') !== '7') {
+    fail(
+      `contract: get_pull_request_files must forward paging, sent page=${query(files, 'page')} ` +
+        `limit=${query(files, 'limit')}`,
+    );
+  }
+  const filePage = payloads.get('get_pull_request_files');
+  if (!Array.isArray(filePage?.items) || filePage?.page !== 2 || filePage?.total_count !== 51) {
+    fail(`contract: get_pull_request_files must return the paginated envelope, got ${JSON.stringify(filePage)}`);
   }
 
   const issuePage = payloads.get('list_issues');

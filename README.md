@@ -39,6 +39,7 @@ to the safe default described above.
 | `list_pull_requests` | read | List PRs; filter by state; paginated |
 | `get_pull_request` | read | A single PR with merge state |
 | `get_pull_request_diff` | read | Unified diff for a PR as plain text |
+| `get_pull_request_files` | read | Files a PR changes, with status and line counts; paginated |
 | `create_pull_request` | write | Open a PR from a head branch into a base branch |
 | `get_commit_status` | read | Combined CI/commit status for a ref |
 | `list_branches` | read | List branches with latest commit and protection status; paginated |

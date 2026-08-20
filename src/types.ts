@@ -145,6 +145,20 @@ export interface PullRequest {
   updated_at: string;
 }
 
+/** One file changed by a pull request. */
+export interface ChangedFile {
+  filename: string;
+  previous_filename?: string;
+  /** added, modified, renamed, deleted, or copied. */
+  status: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+  html_url?: string;
+  contents_url?: string;
+  raw_url?: string;
+}
+
 /** An inline comment on a pull request review, anchored to a file and line. */
 export interface ReviewComment {
   path: string;
