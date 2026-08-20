@@ -292,18 +292,27 @@ async function checkRequestContract() {
         payloads.set(name, JSON.parse(result.content[0].text));
       }
 
-      // The schema's enum is advertising only — the server does not validate tool
-      // input — so a state outside it must be refused by the handler, and must
-      // never reach the API.
-      const badState = await rpc.request('tools/call', {
-        name: 'set_issue_state',
-        arguments: { owner: 'o', repo: 'r', index: 13, state: 'deleted' },
-      });
-      if (!badState?.isError) {
-        fail('contract: set_issue_state must reject a state outside open|closed');
-      }
-      if (stub.received.some((entry) => entry.url.includes('/issues/13'))) {
-        fail('contract: set_issue_state must not send an invalid state to the API');
+      // Every enum in the surface is advertising only — nothing validates tool
+      // input before a handler runs — so an out-of-enum value must be refused by
+      // the handler and must never reach the API. One case per enum field.
+      for (const [name, args, marker] of [
+        ['set_issue_state', { owner: 'o', repo: 'r', index: 13, state: 'deleted' }, '/issues/13'],
+        ['list_issues', { owner: 'bad', repo: 'enum', type: 'everything' }, '/repos/bad/enum'],
+        ['list_issues', { owner: 'bad', repo: 'state', state: 'archived' }, '/repos/bad/state'],
+        ['list_pull_requests', { owner: 'bad', repo: 'prstate', state: 'draft' }, '/repos/bad/prstate'],
+        [
+          'create_pull_request_review',
+          { owner: 'bad', repo: 'review', index: 14, event: 'LGTM' },
+          '/repos/bad/review',
+        ],
+      ]) {
+        const rejected = await rpc.request('tools/call', { name, arguments: args });
+        if (!rejected?.isError) {
+          fail(`contract: ${name} must reject a value outside its enum (${JSON.stringify(args)})`);
+        }
+        if (stub.received.some((entry) => entry.url.includes(marker))) {
+          fail(`contract: ${name} must not send an out-of-enum value to the API`);
+        }
       }
 
       // A page number the server cannot honour must be refused outright rather
@@ -334,6 +343,36 @@ async function checkRequestContract() {
       });
       if (result?.isError) {
         fail(`contract: merge_pull_request returned an error: ${result.content?.[0]?.text ?? '(no text)'}`);
+      }
+
+      // An optional enum must stay optional: omitting style falls back to the
+      // documented default rather than failing the call.
+      const defaultStyle = await elevated.request('tools/call', {
+        name: 'merge_pull_request',
+        arguments: { owner: 'o', repo: 'r', index: 11, head_commit_id: 'feedface' },
+      });
+      if (defaultStyle?.isError) {
+        fail(
+          'contract: merge_pull_request must accept an omitted style: ' +
+            (defaultStyle.content?.[0]?.text ?? '(no text)'),
+        );
+      }
+      const defaulted = stub.received.find((entry) => entry.url.includes('/pulls/11/merge'));
+      if (defaulted?.body?.Do !== 'merge') {
+        fail(`contract: an omitted style must default to merge, sent ${defaulted?.body?.Do}`);
+      }
+
+      // The destructive tier must refuse an unrecognised merge style rather than
+      // let the API decide what it meant.
+      const badStyle = await elevated.request('tools/call', {
+        name: 'merge_pull_request',
+        arguments: {
+          owner: 'bad', repo: 'style', index: 15, style: 'fast-forward', head_commit_id: 'feedface',
+        },
+      });
+      if (!badStyle?.isError) fail('contract: merge_pull_request must reject a style outside its enum');
+      if (stub.received.some((entry) => entry.url.includes('/repos/bad/style'))) {
+        fail('contract: merge_pull_request must not send an out-of-enum style to the API');
       }
     } finally {
       elevated.close();

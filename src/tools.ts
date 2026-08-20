@@ -17,6 +17,37 @@ function req<T = any>(args: Record<string, any>, key: string): T {
   return value as T;
 }
 
+/**
+ * Read an argument that the schema constrains to a set of values.
+ *
+ * A tool's `inputSchema` is advertising, not enforcement: nothing validates
+ * arguments before a handler runs, so the same list that declares the enum has
+ * to do the checking. Both sides read one const, which is what keeps them from
+ * drifting apart.
+ */
+function oneOf<T extends string>(
+  args: Record<string, any>,
+  key: string,
+  allowed: readonly T[],
+): T {
+  const value = req<string>(args, key);
+  if (!(allowed as readonly string[]).includes(value)) {
+    throw new Error(`${key} must be one of ${allowed.join(', ')}; got ${value}`);
+  }
+  return value as T;
+}
+
+/** As `oneOf`, but an omitted argument stays omitted rather than failing. */
+function maybeOneOf<T extends string>(
+  args: Record<string, any>,
+  key: string,
+  allowed: readonly T[],
+): T | undefined {
+  const value = args?.[key];
+  if (value === undefined || value === null || value === '') return undefined;
+  return oneOf(args, key, allowed);
+}
+
 const ownerRepo = {
   owner: { type: 'string', description: 'Repository owner' },
   repo: { type: 'string', description: 'Repository name' },
@@ -34,9 +65,15 @@ const PAGE_SHAPE =
   ' Returns { total_count, count, page, items }; when count is short of ' +
   'total_count, fetch the next page.';
 
+const FILTER_STATES = ['open', 'closed', 'all'] as const;
+const ISSUE_TYPES = ['issues', 'pulls', 'all'] as const;
+const ISSUE_STATES = ['open', 'closed'] as const;
+const REVIEW_EVENTS = ['APPROVED', 'REQUEST_CHANGES', 'COMMENT'] as const;
+const MERGE_STYLES = ['merge', 'rebase', 'squash'] as const;
+
 const stateEnum = {
   type: 'string',
-  enum: ['open', 'closed', 'all'],
+  enum: FILTER_STATES,
   description: 'Filter by state (default: open)',
 } as const;
 
@@ -79,7 +116,7 @@ export const tools: ToolDefinition[] = [
         labels: { type: 'string', description: 'Comma-separated label names to filter by' },
         type: {
           type: 'string',
-          enum: ['issues', 'pulls', 'all'],
+          enum: ISSUE_TYPES,
           default: 'issues',
           description: 'Which kind to return (default: issues); all returns both',
         },
@@ -89,9 +126,9 @@ export const tools: ToolDefinition[] = [
     },
     handler: (c, a) =>
       c.listIssues(req(a, 'owner'), req(a, 'repo'), {
-        state: a.state,
+        state: maybeOneOf(a, 'state', FILTER_STATES),
         labels: a.labels,
-        type: a.type ?? 'issues',
+        type: maybeOneOf(a, 'type', ISSUE_TYPES) ?? 'issues',
         page: a.page,
         limit: a.limit,
       }),
@@ -280,7 +317,7 @@ export const tools: ToolDefinition[] = [
     },
     handler: (c, a) =>
       c.listPullRequests(req(a, 'owner'), req(a, 'repo'), {
-        state: a.state,
+        state: maybeOneOf(a, 'state', FILTER_STATES),
         page: a.page,
         limit: a.limit,
       }),
@@ -567,7 +604,7 @@ export const tools: ToolDefinition[] = [
           type: 'string',
           // Forgejo's ReviewStateType; anything outside it is treated as a
           // pending draft review rather than rejected, so the value must match.
-          enum: ['APPROVED', 'REQUEST_CHANGES', 'COMMENT'],
+          enum: REVIEW_EVENTS,
           description: 'Review verdict',
         },
         body: { type: 'string', description: 'Review comment (Markdown)' },
@@ -576,7 +613,7 @@ export const tools: ToolDefinition[] = [
     },
     handler: (c, a) =>
       c.createPullRequestReview(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
-        event: req(a, 'event'),
+        event: oneOf(a, 'event', REVIEW_EVENTS),
         body: a.body,
       }),
   },
@@ -657,22 +694,19 @@ export const tools: ToolDefinition[] = [
         index: { type: 'number', description: 'Issue or pull request number' },
         state: {
           type: 'string',
-          enum: ['open', 'closed'],
+          enum: ISSUE_STATES,
           description: 'State to set',
         },
       },
       required: ['owner', 'repo', 'index', 'state'],
     },
-    handler: (c, a) => {
-      // The inputSchema enum is advertising, not enforcement — nothing validates
-      // tool arguments before a handler runs — so check it here rather than
-      // forwarding an arbitrary string as an issue state.
-      const state = req<string>(a, 'state');
-      if (state !== 'open' && state !== 'closed') {
-        throw new Error(`state must be open or closed, got ${state}`);
-      }
-      return c.setIssueState(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), state);
-    },
+    handler: (c, a) =>
+      c.setIssueState(
+        req(a, 'owner'),
+        req(a, 'repo'),
+        req(a, 'index'),
+        oneOf(a, 'state', ISSUE_STATES),
+      ),
   },
   {
     name: 'add_assignees',
@@ -728,7 +762,7 @@ export const elevatedTools: ToolDefinition[] = [
         },
         style: {
           type: 'string',
-          enum: ['merge', 'rebase', 'squash'],
+          enum: MERGE_STYLES,
           description: 'Merge strategy (default: merge)',
         },
       },
@@ -736,7 +770,7 @@ export const elevatedTools: ToolDefinition[] = [
     },
     handler: (c, a) =>
       c.mergePullRequest(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
-        style: a.style,
+        style: maybeOneOf(a, 'style', MERGE_STYLES),
         head_commit_id: req(a, 'head_commit_id'),
       }),
   },
