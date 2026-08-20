@@ -663,8 +663,16 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'state'],
     },
-    handler: (c, a) =>
-      c.setIssueState(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'state')),
+    handler: (c, a) => {
+      // The inputSchema enum is advertising, not enforcement — nothing validates
+      // tool arguments before a handler runs — so check it here rather than
+      // forwarding an arbitrary string as an issue state.
+      const state = req<string>(a, 'state');
+      if (state !== 'open' && state !== 'closed') {
+        throw new Error(`state must be open or closed, got ${state}`);
+      }
+      return c.setIssueState(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), state);
+    },
   },
   {
     name: 'add_assignees',

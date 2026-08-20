@@ -292,6 +292,20 @@ async function checkRequestContract() {
         payloads.set(name, JSON.parse(result.content[0].text));
       }
 
+      // The schema's enum is advertising only — the server does not validate tool
+      // input — so a state outside it must be refused by the handler, and must
+      // never reach the API.
+      const badState = await rpc.request('tools/call', {
+        name: 'set_issue_state',
+        arguments: { owner: 'o', repo: 'r', index: 13, state: 'deleted' },
+      });
+      if (!badState?.isError) {
+        fail('contract: set_issue_state must reject a state outside open|closed');
+      }
+      if (stub.received.some((entry) => entry.url.includes('/issues/13'))) {
+        fail('contract: set_issue_state must not send an invalid state to the API');
+      }
+
       // A page number the server cannot honour must be refused outright rather
       // than sent and then reported back as some other page.
       const badPage = await rpc.request('tools/call', {
