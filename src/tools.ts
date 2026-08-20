@@ -645,6 +645,36 @@ export const tools: ToolDefinition[] = [
       c.addLabels(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'labels')),
   },
   {
+    name: 'set_issue_state',
+    description:
+      'Close or reopen an issue or pull request (they share numbering). Reversible: ' +
+      'the state flips back and the timeline records both events. Title and body are ' +
+      'deliberately not editable here.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Issue or pull request number' },
+        state: {
+          type: 'string',
+          enum: ['open', 'closed'],
+          description: 'State to set',
+        },
+      },
+      required: ['owner', 'repo', 'index', 'state'],
+    },
+    handler: (c, a) => {
+      // The inputSchema enum is advertising, not enforcement — nothing validates
+      // tool arguments before a handler runs — so check it here rather than
+      // forwarding an arbitrary string as an issue state.
+      const state = req<string>(a, 'state');
+      if (state !== 'open' && state !== 'closed') {
+        throw new Error(`state must be open or closed, got ${state}`);
+      }
+      return c.setIssueState(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), state);
+    },
+  },
+  {
     name: 'add_assignees',
     description:
       'Assign users to an issue or pull request (they share numbering). Additive write: ' +

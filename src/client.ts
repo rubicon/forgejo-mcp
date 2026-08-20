@@ -502,6 +502,17 @@ export class ForgejoClient {
     });
   }
 
+  /**
+   * Close or reopen an issue. Only `state` is sent: the same endpoint edits the
+   * title and body, and this client deliberately never reaches for those.
+   */
+  setIssueState(owner: string, repo: string, index: number, state: string): Promise<Issue> {
+    return this.request(`${this.repoBase(owner, repo)}/issues/${index}`, {
+      method: 'PATCH',
+      body: { state },
+    });
+  }
+
   // Additive: Forgejo has no add-assignee endpoint, and the issue-edit endpoint
   // replaces the whole assignee list — so read the current assignees and merge
   // the new ones in rather than clobbering them.
