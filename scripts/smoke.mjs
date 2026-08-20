@@ -346,12 +346,16 @@ async function checkRequestContract() {
 
       // A page number the server cannot honour must be refused outright rather
       // than sent and then reported back as some other page.
-      const badPage = await rpc.request('tools/call', {
-        name: 'list_repositories',
-        arguments: { page: 0 },
-      });
-      if (!badPage?.isError) {
-        fail('contract: a list tool must reject page=0 instead of reporting a different page');
+      for (const [name, args] of [
+        ['list_repositories', { page: 0 }],
+        // Delegating to requestPage is what enforces this; assert it per tool so
+        // a hand-rolled fetch cannot quietly opt out.
+        ['get_pull_request_files', { owner: 'bad', repo: 'page', index: 22, page: 0 }],
+      ]) {
+        const badPage = await rpc.request('tools/call', { name, arguments: args });
+        if (!badPage?.isError) {
+          fail(`contract: ${name} must reject page=0 instead of reporting a different page`);
+        }
       }
     } finally {
       rpc.close();
