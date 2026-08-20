@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Dax Davis / Rubicon TechVentures
 import type {
   Branch,
+  ChangedFile,
   Comment,
   Commit,
   CommitStatus,
@@ -312,6 +313,18 @@ export class ForgejoClient {
 
   getPullRequestDiff(owner: string, repo: string, index: number): Promise<string> {
     return this.requestText(`${this.repoBase(owner, repo)}/pulls/${index}.diff`);
+  }
+
+  listPullRequestFiles(
+    owner: string,
+    repo: string,
+    index: number,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<Paginated<ChangedFile>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/pulls/${index}/files`, {
+      page: opts.page,
+      limit: opts.limit,
+    });
   }
 
   createPullRequest(
