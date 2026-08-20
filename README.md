@@ -27,7 +27,7 @@ to the safe default described above.
 |------|------|---------|
 | `list_repositories` | read | List a user's repositories (default: authenticated user); paginated |
 | `get_repository` | read | Repository metadata, including default branch |
-| `list_issues` | read | List issues; filter by state, labels, and `type` (default `issues`); paginated |
+| `list_issues` | read | List issues; filter by state, labels, `type` (default `issues`), text `q`, milestones, author, assignee, mention, and date; sortable; paginated |
 | `get_issue` | read | A single issue with body, labels, assignees |
 | `create_issue` | write | Open an issue (optional labels, assignees) |
 | `list_issue_comments` | read | Comments on an issue or PR; paginated |
@@ -36,7 +36,7 @@ to the safe default described above.
 | `list_directory` | read | List a directory's entries (root if no path) |
 | `create_file` | write | Create a file from plain-text content (optional new branch) |
 | `update_file` | write | Replace a file's content (`sha` required — the blob SHA being replaced) |
-| `list_pull_requests` | read | List PRs; filter by state; paginated |
+| `list_pull_requests` | read | List PRs; filter by state, milestone id, label ids, and poster; sortable; paginated |
 | `get_pull_request` | read | A single PR with merge state |
 | `get_pull_request_diff` | read | Unified diff for a PR as plain text |
 | `get_pull_request_files` | read | Files a PR changes, with status and line counts; paginated |

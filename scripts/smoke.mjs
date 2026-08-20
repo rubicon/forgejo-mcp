@@ -282,6 +282,18 @@ async function checkRequestContract() {
       for (const [name, args] of [
         ['list_issues', { owner: 'o', repo: 'r' }],
         ['list_issues', { owner: 'o', repo: 'r', type: 'all' }],
+        [
+          'list_issues',
+          {
+            owner: 'f', repo: 'ilter', q: 'crash', milestones: 'v1,v2', since: '2026-08-01T00:00:00Z',
+            before: '2026-08-20T00:00:00Z', created_by: 'dax', assigned_by: 'sam',
+            mentioned_by: 'kim', sort: 'nearduedate',
+          },
+        ],
+        [
+          'list_pull_requests',
+          { owner: 'f', repo: 'prfilter', sort: 'priority', milestone: 4, poster: 'dax', labels: [7, 9] },
+        ],
         ['list_repositories', { page: 2, limit: 5 }],
         ['update_file', { owner: 'o', repo: 'r', path: 'docs/a.md', content: 'x', sha: 'abc123' }],
         [
@@ -312,6 +324,10 @@ async function checkRequestContract() {
         ['list_issues', { owner: 'bad', repo: 'enum', type: 'everything' }, '/repos/bad/enum'],
         ['list_issues', { owner: 'bad', repo: 'state', state: 'archived' }, '/repos/bad/state'],
         ['list_pull_requests', { owner: 'bad', repo: 'prstate', state: 'draft' }, '/repos/bad/prstate'],
+        // The two endpoints sort by different things; a value valid on one must
+        // not be accepted by the other.
+        ['list_issues', { owner: 'bad', repo: 'isort', sort: 'priority' }, '/repos/bad/isort'],
+        ['list_pull_requests', { owner: 'bad', repo: 'psort', sort: 'relevance' }, '/repos/bad/psort'],
         [
           'create_pull_request_review',
           { owner: 'bad', repo: 'review', index: 14, event: 'LGTM' },
@@ -547,6 +563,23 @@ async function checkRequestContract() {
 
   const removed = only('DELETE', '/api/v1/repos/o/r/issues/31/labels/needs%20triage%2Furgent');
   if (!removed) fail('contract: remove_label must DELETE the encoded identifier path');
+
+  const filtered = only('GET', '/api/v1/repos/f/ilter/issues');
+  for (const [key, want] of [
+    ['q', 'crash'], ['milestones', 'v1,v2'], ['since', '2026-08-01T00:00:00Z'],
+    ['before', '2026-08-20T00:00:00Z'], ['created_by', 'dax'], ['assigned_by', 'sam'],
+    ['mentioned_by', 'kim'], ['sort', 'nearduedate'],
+  ]) {
+    if (query(filtered, key) !== want) {
+      fail(`contract: list_issues must forward ${key}=${want}, sent ${query(filtered, key)}`);
+    }
+  }
+  const prFiltered = only('GET', '/api/v1/repos/f/prfilter/pulls');
+  for (const [key, want] of [['sort', 'priority'], ['milestone', '4'], ['poster', 'dax'], ['labels', '7,9']]) {
+    if (query(prFiltered, key) !== want) {
+      fail(`contract: list_pull_requests must forward ${key}=${want}, sent ${query(prFiltered, key)}`);
+    }
+  }
 
   const issuePage = payloads.get('list_issues');
   if (issuePage?.page !== 1 || issuePage?.total_count !== 51) {
