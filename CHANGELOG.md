@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0](https://github.com/rubicon/forgejo-mcp/compare/v0.10.0...v0.11.0) (2026-08-20)
+
+
+### Added
+
+* remove a label from an issue or pull request ([#90](https://github.com/rubicon/forgejo-mcp/issues/90)) ([d7f6911](https://github.com/rubicon/forgejo-mcp/commit/d7f691129070817689fc954fb165832492f460c7)), closes [#88](https://github.com/rubicon/forgejo-mcp/issues/88)
+
 ## [0.10.0](https://github.com/rubicon/forgejo-mcp/compare/v0.9.0...v0.10.0) (2026-08-20)
 
 
