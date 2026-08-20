@@ -67,6 +67,14 @@ function reviewComments(value: unknown): ReviewComment[] | undefined {
     if (typeof body !== 'string' || body === '') {
       throw new Error(`comments[${index}].body is required`);
     }
+    for (const [key, position] of [
+      ['new_position', new_position],
+      ['old_position', old_position],
+    ] as const) {
+      if (position !== undefined && !Number.isInteger(position)) {
+        throw new Error(`comments[${index}].${key} must be a whole number; got ${position}`);
+      }
+    }
     return { path, body, new_position, old_position } as ReviewComment;
   });
 }

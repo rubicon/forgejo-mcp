@@ -326,6 +326,9 @@ async function checkRequestContract() {
       for (const bad of [
         { path: '', body: 'nowhere' },
         { path: 'src/a.ts', body: '' },
+        // The schema says number; nothing enforces a schema, so a numeric string
+        // would be forwarded as a string and anchor the comment nowhere.
+        { path: 'src/a.ts', body: 'stringly typed', new_position: '12' },
       ]) {
         const rejected = await rpc.request('tools/call', {
           name: 'create_pull_request_review',
