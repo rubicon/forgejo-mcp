@@ -58,6 +58,7 @@ to the safe default described above.
 | `request_pull_request_reviewers` | write | Request reviews from users (and org teams) on a PR |
 | `list_labels` | read | Labels defined in a repository (id, name, color); paginated |
 | `add_labels` | write | Add labels (by id) to an issue or PR; existing labels kept |
+| `remove_label` | write | Remove one label (by name or id) from an issue or PR |
 | `add_assignees` | write | Assign users to an issue or PR; existing assignees kept |
 | `set_issue_state` | write | Close or reopen an issue or PR (state only — no title/body edits) |
 
