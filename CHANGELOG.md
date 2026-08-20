@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0](https://github.com/rubicon/forgejo-mcp/compare/v0.7.0...v0.8.0) (2026-08-20)
+
+
+### Added
+
+* close and reopen issues ([#78](https://github.com/rubicon/forgejo-mcp/issues/78)) ([8d42be5](https://github.com/rubicon/forgejo-mcp/commit/8d42be540713605d667e5c19163ef8fc92b67db8)), closes [#77](https://github.com/rubicon/forgejo-mcp/issues/77)
+
+
+### Fixed
+
+* enforce the enums the tool schemas advertise ([#81](https://github.com/rubicon/forgejo-mcp/issues/81)) ([c4e5b2f](https://github.com/rubicon/forgejo-mcp/commit/c4e5b2fb429942a8d6f171e9e0dd9aba20ce77b7)), closes [#79](https://github.com/rubicon/forgejo-mcp/issues/79)
+
 ## [0.7.0](https://github.com/rubicon/forgejo-mcp/compare/v0.6.0...v0.7.0) (2026-08-16)
 
 
