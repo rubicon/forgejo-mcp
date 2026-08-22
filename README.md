@@ -29,11 +29,11 @@ to the safe default described above.
 | `get_repository` | read | Repository metadata, including default branch |
 | `list_issues` | read | List issues; filter by state, labels, `type` (default `issues`), text `q`, milestones, author, assignee, mention, and date; sortable; paginated |
 | `get_issue` | read | A single issue with body, labels, assignees |
-| `create_issue` | write | Open an issue (optional labels, assignees) |
+| `create_issue` | write | Open an issue (labels by name or id, assignees) |
 | `list_issue_comments` | read | Comments on an issue or PR; paginated |
 | `create_issue_comment` | write | Add a comment to an issue or PR |
 | `get_file_content` | read | Decoded file content (default branch if no ref) |
-| `list_directory` | read | List a directory's entries (root if no path) |
+| `list_directory` | read | List a directory's entries (root if no path); fails on a file path; paginated |
 | `create_file` | write | Create a file from plain-text content (optional new branch) |
 | `update_file` | write | Replace a file's content (`sha` required — the blob SHA being replaced) |
 | `list_pull_requests` | read | List PRs; filter by state, milestone id, label ids, and poster; sortable; paginated |
@@ -57,7 +57,7 @@ to the safe default described above.
 | `create_pull_request_review` | write | Submit a review (`APPROVED`, `REQUEST_CHANGES`, or `COMMENT`), with optional inline comments pinned to a `commit_id` |
 | `request_pull_request_reviewers` | write | Request reviews from users (and org teams) on a PR |
 | `list_labels` | read | Labels defined in a repository (id, name, color); paginated |
-| `add_labels` | write | Add labels (by id) to an issue or PR; existing labels kept |
+| `add_labels` | write | Add labels (by name or id) to an issue or PR; existing labels kept |
 | `remove_label` | write | Remove one label (by name or id) from an issue or PR |
 | `add_assignees` | write | Assign users to an issue or PR; existing assignees kept |
 | `set_issue_state` | write | Close or reopen an issue or PR (state only — no title/body edits) |

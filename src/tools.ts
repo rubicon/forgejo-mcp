@@ -221,8 +221,10 @@ export const tools: ToolDefinition[] = [
         body: { type: 'string', description: 'Issue description (Markdown)' },
         labels: {
           type: 'array',
-          items: { type: 'number' },
-          description: 'Label IDs to apply',
+          items: { type: ['string', 'number'] },
+          description:
+            'Labels to apply, each a name or an id (note: list_issues filters by ' +
+            'comma-separated names instead)',
         },
         assignees: {
           type: 'array',
@@ -299,7 +301,8 @@ export const tools: ToolDefinition[] = [
     name: 'list_directory',
     description:
       'List the entries in a repository directory (name, path, type, size, SHA). ' +
-      'Omit path for the repository root; omit ref for the default branch.',
+      'Omit path for the repository root; omit ref for the default branch. Fails if the ' +
+      'path names a file — use get_file_content for those.' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -309,7 +312,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo'],
     },
-    handler: (c, a) => c.listContents(req(a, 'owner'), req(a, 'repo'), a.path, a.ref),
+    handler: (c, a) => c.listDirectory(req(a, 'owner'), req(a, 'repo'), a.path, a.ref),
   },
   {
     name: 'create_file',
@@ -773,8 +776,8 @@ export const tools: ToolDefinition[] = [
   {
     name: 'list_labels',
     description:
-      'List the labels defined in a repository (id, name, color). Use it to resolve label ' +
-      'names to the ids that add_labels expects. Paginated.' + PAGE_SHAPE,
+      'List the labels defined in a repository (id, name, color). Useful for discovering ' +
+      'what exists; add_labels and remove_label both take names directly. Paginated.' + PAGE_SHAPE,
     inputSchema: {
       type: 'object',
       properties: {
@@ -790,7 +793,7 @@ export const tools: ToolDefinition[] = [
     name: 'add_labels',
     description:
       'Add labels to an issue or pull request (they share numbering). Additive write: ' +
-      'existing labels are kept. labels are label ids (see list_labels).',
+      'existing labels are kept. Each label is a name or an id.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -798,8 +801,8 @@ export const tools: ToolDefinition[] = [
         index: { type: 'number', description: 'Issue or pull request number' },
         labels: {
           type: 'array',
-          items: { type: 'number' },
-          description: 'Label ids to add (from list_labels)',
+          items: { type: ['string', 'number'] },
+          description: 'Labels to add, each a name or an id; list_labels is optional',
         },
       },
       required: ['owner', 'repo', 'index', 'labels'],

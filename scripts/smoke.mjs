@@ -168,7 +168,12 @@ function startStubForgejo() {
       // metadata the list tools report has something to report.
       if (req.method === 'GET') {
         res.writeHead(200, { 'content-type': 'application/json', 'x-total-count': '51' });
-        res.end(JSON.stringify([{ id: 1 }, { id: 2 }]));
+        // The contents endpoint answers with a single object for a file path.
+        res.end(
+          req.url.includes('/contents/a-file.md')
+            ? JSON.stringify({ type: 'file', name: 'a-file.md' })
+            : JSON.stringify([{ id: 1 }, { id: 2 }]),
+        );
         return;
       }
       res.writeHead(200, { 'content-type': 'application/json' });
@@ -248,6 +253,13 @@ function checkToolSchemas(tools) {
     }
   }
 
+  for (const [tool, field] of [['add_labels', 'labels'], ['create_issue', 'labels']]) {
+    const items = schemaOf(tools, tool).properties?.[field]?.items ?? {};
+    if (items.type === 'number') {
+      fail(`schema: ${tool}.${field} must accept names or ids, not ids alone`);
+    }
+  }
+
   const update = schemaOf(tools, 'update_file');
   if (!(update.required ?? []).includes('sha')) {
     fail('schema: update_file must require sha (the API rejects an update without it)');
@@ -307,6 +319,8 @@ async function checkRequestContract() {
         ['get_pull_request_files', { owner: 'o', repo: 'r', index: 21, page: 2, limit: 7 }],
         // A label name may contain characters that must not corrupt the URL.
         ['remove_label', { owner: 'o', repo: 'r', index: 31, label: 'needs triage/urgent' }],
+        // Labels go on the same way they come off: names or ids, the API accepts both.
+        ['add_labels', { owner: 'o', repo: 'r', index: 41, labels: ['needs triage/urgent', 7] }],
         ['set_issue_state', { owner: 'o', repo: 'r', index: 12, state: 'closed' }],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
@@ -362,6 +376,27 @@ async function checkRequestContract() {
         if (stub.received.some((entry) => entry.url.includes('/repos/bad/comment'))) {
           fail('contract: an invalid inline comment must not reach the API');
         }
+      }
+
+      // list_directory lists directories. A file path used to return a single
+      // object, making the tool's return type unpredictable before the call.
+      const dirPage = await rpc.request('tools/call', {
+        name: 'list_directory',
+        arguments: { owner: 'o', repo: 'r', path: 'src' },
+      });
+      if (dirPage?.isError) fail(`contract: list_directory errored: ${dirPage.content?.[0]?.text}`);
+      const dirBody = JSON.parse(dirPage.content[0].text);
+      if (!Array.isArray(dirBody?.items) || dirBody?.page !== 1) {
+        fail(`contract: list_directory must return the paginated envelope, got ${JSON.stringify(dirBody)}`);
+      }
+
+      // A file path must be refused, not returned as an object.
+      const asFile = await rpc.request('tools/call', {
+        name: 'list_directory',
+        arguments: { owner: 'o', repo: 'r', path: 'a-file.md' },
+      });
+      if (!asFile?.isError) {
+        fail('contract: list_directory must refuse a path that names a file');
       }
 
       // A page number the server cannot honour must be refused outright rather
@@ -559,6 +594,11 @@ async function checkRequestContract() {
   const filePage = payloads.get('get_pull_request_files');
   if (!Array.isArray(filePage?.items) || filePage?.page !== 2 || filePage?.total_count !== 51) {
     fail(`contract: get_pull_request_files must return the paginated envelope, got ${JSON.stringify(filePage)}`);
+  }
+
+  const added = only('POST', '/api/v1/repos/o/r/issues/41/labels');
+  if (JSON.stringify(added.body?.labels) !== JSON.stringify(['needs triage/urgent', 7])) {
+    fail(`contract: add_labels must forward names and ids verbatim, sent ${JSON.stringify(added.body?.labels)}`);
   }
 
   const removed = only('DELETE', '/api/v1/repos/o/r/issues/31/labels/needs%20triage%2Furgent');
