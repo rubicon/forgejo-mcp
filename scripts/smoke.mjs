@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 // + get_pull_request_files (#85) + remove_label (#88) = 36 base tools; elevated
 // adds 2 more.
 const BASE_TOOLS = 36;
-const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch'];
+const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo'];
 const EXPECTED_NAMES = [
   'create_release',
   'list_releases',
@@ -468,6 +468,46 @@ async function checkRequestContract() {
         fail('contract: delete_branch must report the branch it deleted');
       }
 
+      // A repository is the one thing an agent can create whose visibility it also
+      // chooses, so private is the default and public must be asked for.
+      // Only a literal boolean false may publish. Schemas are advisory here, so a
+      // client sending the string "false" must not be read as a request to publish.
+      for (const [args, wantPrivate] of [
+        [{ name: 'scratch-repo' }, true],
+        [{ name: 'p-string', private: 'false' }, true],
+        [{ name: 'p-null', private: null }, true],
+        [{ name: 'p-zero', private: 0 }, true],
+        [{ name: 'p-false', private: false }, false],
+      ]) {
+        const made = await elevated.request('tools/call', { name: 'create_repo', arguments: args });
+        if (made?.isError) fail(`contract: create_repo errored for ${JSON.stringify(args)}`);
+        const sent = stub.received.filter((e) => e.method === 'POST' && e.url === '/api/v1/user/repos').pop();
+        if (sent?.body?.private !== wantPrivate) {
+          fail(
+            `contract: create_repo with ${JSON.stringify(args.private)} must send ` +
+              `private=${wantPrivate}, sent ${JSON.stringify(sent?.body?.private)}`,
+          );
+        }
+      }
+
+      // Deleting a repository is the only operation here with no undo, so the
+      // caller must name what it is deleting.
+      for (const bad of [
+        { owner: 'o', repo: 'r' },
+        { owner: 'o', repo: 'r', confirm: 'r' },
+        { owner: 'o', repo: 'r', confirm: 'o/other' },
+      ]) {
+        const refused = await elevated.request('tools/call', { name: 'delete_repo', arguments: bad });
+        if (!refused?.isError) {
+          fail(`contract: delete_repo must refuse ${JSON.stringify(bad)}`);
+        }
+      }
+      const goneRepo = await elevated.request('tools/call', {
+        name: 'delete_repo',
+        arguments: { owner: 'o', repo: 'doomed', confirm: 'o/doomed' },
+      });
+      if (goneRepo?.isError) fail(`contract: delete_repo errored: ${goneRepo.content?.[0]?.text}`);
+
       // The destructive tier must refuse an unrecognised merge style rather than
       // let the API decide what it meant.
       const badStyle = await elevated.request('tools/call', {
@@ -542,6 +582,11 @@ async function checkRequestContract() {
   if (review.body?.event !== 'APPROVED') {
     fail(`contract: create_pull_request_review must forward the event verbatim, sent ${review.body?.event}`);
   }
+  only('DELETE', '/api/v1/repos/o/doomed');
+  if (stub.received.some((e) => e.method === 'DELETE' && parsed(e).pathname === '/api/v1/repos/o/r')) {
+    fail('contract: a refused delete_repo must send no request');
+  }
+
   const branchDelete = only('DELETE', '/api/v1/repos/o/r/branches/dev%2F88-remove-label');
   if (!branchDelete) fail('contract: delete_branch must DELETE the encoded branch path');
 

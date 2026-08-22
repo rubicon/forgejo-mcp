@@ -922,6 +922,69 @@ export const elevatedTools: ToolDefinition[] = [
       }),
   },
   {
+    name: 'create_repo',
+    description:
+      '[ELEVATED] Create a repository owned by the authenticated user. Private unless ' +
+      'private is explicitly false: a repository is the one thing whose visibility the ' +
+      'caller chooses, which makes a public one a place to copy private content into.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Repository name' },
+        description: { type: 'string', description: 'Short description' },
+        private: {
+          type: 'boolean',
+          default: true,
+          description: 'Visibility; omit for private. Pass false deliberately to publish it.',
+        },
+        auto_init: { type: 'boolean', description: 'Create an initial commit with a README' },
+        default_branch: { type: 'string', description: 'Name for the initial branch' },
+      },
+      required: ['name'],
+    },
+    handler: (c, a) =>
+      c.createRepo({
+        name: req(a, 'name'),
+        description: a.description,
+        private: a.private === false ? false : true,
+        auto_init: a.auto_init,
+        default_branch: a.default_branch,
+      }),
+  },
+  {
+    name: 'delete_repo',
+    description:
+      '[ELEVATED — DESTRUCTIVE] Permanently delete a repository, with its issues, pull ' +
+      'requests, and history. This cannot be undone by any means. confirm must equal ' +
+      'owner/repo exactly, which catches a malformed or half-specified call; it is not ' +
+      'proof the caller read the repository, since both values come from the same ' +
+      'arguments. Never allowlist this tool — the per-call approval prompt is the guard.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        confirm: {
+          type: 'string',
+          description: 'Must equal owner/repo exactly, naming the repository to delete',
+        },
+      },
+      required: ['owner', 'repo', 'confirm'],
+    },
+    handler: (c, a) => {
+      const owner = req<string>(a, 'owner');
+      const repo = req<string>(a, 'repo');
+      const target = `${owner}/${repo}`;
+      // A typo-catcher, not a security boundary: confirm and target both come from
+      // the same tool-call arguments, so injected text can satisfy it. What stops a
+      // misled call is the approval prompt, which is why this tool must never be
+      // allowlisted.
+      if (req<string>(a, 'confirm') !== target) {
+        throw new Error(`confirm must be exactly "${target}" to delete it`);
+      }
+      return c.deleteRepo(owner, repo);
+    },
+  },
+  {
     name: 'delete_branch',
     description:
       '[ELEVATED — DESTRUCTIVE] Permanently delete a branch. This cannot be undone; ' +
