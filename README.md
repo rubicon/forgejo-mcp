@@ -190,10 +190,12 @@ tier is **off by default** and must be deliberately enabled by the operator.
 
 Each elevated tool's description is prefixed with `[ELEVATED — DESTRUCTIVE]`.
 
-`delete_repo` **requires** `confirm` to equal `owner/repo` exactly. Deleting a
-repository is the only operation here with no undo of any kind, and the double
-gate proves the operator enabled the tier, not that the caller knows which
-repository it is about to destroy.
+`delete_repo` **requires** `confirm` to equal `owner/repo` exactly. Be clear about
+what that buys: it catches a malformed or half-specified call, and nothing more.
+Both `confirm` and the target come from the same tool-call arguments, so text
+injected into an issue can satisfy it as easily as a careful caller. Deleting a
+repository is the only operation here with no undo of any kind, so **never
+allowlist `delete_repo`** — the per-call approval prompt is the actual guard.
 
 `create_repo` creates a **private** repository unless `private: false` is passed
 deliberately. A repository is the one thing an agent can create whose visibility

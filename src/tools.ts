@@ -956,7 +956,9 @@ export const elevatedTools: ToolDefinition[] = [
     description:
       '[ELEVATED — DESTRUCTIVE] Permanently delete a repository, with its issues, pull ' +
       'requests, and history. This cannot be undone by any means. confirm must equal ' +
-      'owner/repo exactly, so the repository being deleted has to be named, not inferred.',
+      'owner/repo exactly, which catches a malformed or half-specified call; it is not ' +
+      'proof the caller read the repository, since both values come from the same ' +
+      'arguments. Never allowlist this tool — the per-call approval prompt is the guard.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -972,8 +974,10 @@ export const elevatedTools: ToolDefinition[] = [
       const owner = req<string>(a, 'owner');
       const repo = req<string>(a, 'repo');
       const target = `${owner}/${repo}`;
-      // The double gate proves the operator enabled the tier. It does not prove
-      // the caller knows which repository it is about to destroy.
+      // A typo-catcher, not a security boundary: confirm and target both come from
+      // the same tool-call arguments, so injected text can satisfy it. What stops a
+      // misled call is the approval prompt, which is why this tool must never be
+      // allowlisted.
       if (req<string>(a, 'confirm') !== target) {
         throw new Error(`confirm must be exactly "${target}" to delete it`);
       }

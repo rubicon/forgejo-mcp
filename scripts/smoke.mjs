@@ -470,11 +470,25 @@ async function checkRequestContract() {
 
       // A repository is the one thing an agent can create whose visibility it also
       // chooses, so private is the default and public must be asked for.
-      const madeRepo = await elevated.request('tools/call', {
-        name: 'create_repo',
-        arguments: { name: 'scratch-repo' },
-      });
-      if (madeRepo?.isError) fail(`contract: create_repo errored: ${madeRepo.content?.[0]?.text}`);
+      // Only a literal boolean false may publish. Schemas are advisory here, so a
+      // client sending the string "false" must not be read as a request to publish.
+      for (const [args, wantPrivate] of [
+        [{ name: 'scratch-repo' }, true],
+        [{ name: 'p-string', private: 'false' }, true],
+        [{ name: 'p-null', private: null }, true],
+        [{ name: 'p-zero', private: 0 }, true],
+        [{ name: 'p-false', private: false }, false],
+      ]) {
+        const made = await elevated.request('tools/call', { name: 'create_repo', arguments: args });
+        if (made?.isError) fail(`contract: create_repo errored for ${JSON.stringify(args)}`);
+        const sent = stub.received.filter((e) => e.method === 'POST' && e.url === '/api/v1/user/repos').pop();
+        if (sent?.body?.private !== wantPrivate) {
+          fail(
+            `contract: create_repo with ${JSON.stringify(args.private)} must send ` +
+              `private=${wantPrivate}, sent ${JSON.stringify(sent?.body?.private)}`,
+          );
+        }
+      }
 
       // Deleting a repository is the only operation here with no undo, so the
       // caller must name what it is deleting.
@@ -567,10 +581,6 @@ async function checkRequestContract() {
   }
   if (review.body?.event !== 'APPROVED') {
     fail(`contract: create_pull_request_review must forward the event verbatim, sent ${review.body?.event}`);
-  }
-  const repoCreate = only('POST', '/api/v1/user/repos');
-  if (repoCreate.body?.private !== true) {
-    fail(`contract: create_repo must default to private, sent ${JSON.stringify(repoCreate.body)}`);
   }
   only('DELETE', '/api/v1/repos/o/doomed');
   if (stub.received.some((e) => e.method === 'DELETE' && parsed(e).pathname === '/api/v1/repos/o/r')) {
