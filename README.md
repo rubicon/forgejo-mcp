@@ -29,7 +29,7 @@ to the safe default described above.
 | `get_repository` | read | Repository metadata, including default branch |
 | `list_issues` | read | List issues; filter by state, labels, `type` (default `issues`), text `q`, milestones, author, assignee, mention, and date; sortable; paginated |
 | `get_issue` | read | A single issue with body, labels, assignees |
-| `create_issue` | write | Open an issue (labels by name or id, assignees) |
+| `create_issue` | write | Open an issue (labels by id, assignees) |
 | `list_issue_comments` | read | Comments on an issue or PR; paginated |
 | `create_issue_comment` | write | Add a comment to an issue or PR |
 | `get_file_content` | read | Decoded file content (default branch if no ref) |

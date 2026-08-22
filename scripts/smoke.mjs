@@ -253,11 +253,16 @@ function checkToolSchemas(tools) {
     }
   }
 
-  for (const [tool, field] of [['add_labels', 'labels'], ['create_issue', 'labels']]) {
-    const items = schemaOf(tools, tool).properties?.[field]?.items ?? {};
-    if (items.type === 'number') {
-      fail(`schema: ${tool}.${field} must accept names or ids, not ids alone`);
-    }
+  // The two endpoints genuinely differ: IssueLabelsOption takes names or ids,
+  // CreateIssueOption.labels is []int64. Mirror that rather than advertising a
+  // flexibility the create endpoint does not have.
+  const addItems = schemaOf(tools, 'add_labels').properties?.labels?.items ?? {};
+  if (!Array.isArray(addItems.type) || !addItems.type.includes('string')) {
+    fail(`schema: add_labels.labels must accept names or ids, got ${JSON.stringify(addItems.type)}`);
+  }
+  const createItems = schemaOf(tools, 'create_issue').properties?.labels?.items ?? {};
+  if (createItems.type !== 'number') {
+    fail(`schema: create_issue.labels must stay ids-only, got ${JSON.stringify(createItems.type)}`);
   }
 
   const update = schemaOf(tools, 'update_file');

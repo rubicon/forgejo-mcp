@@ -221,10 +221,10 @@ export const tools: ToolDefinition[] = [
         body: { type: 'string', description: 'Issue description (Markdown)' },
         labels: {
           type: 'array',
-          items: { type: ['string', 'number'] },
+          items: { type: 'number' },
           description:
-            'Labels to apply, each a name or an id (note: list_issues filters by ' +
-            'comma-separated names instead)',
+            'Label ids to apply (see list_labels). Unlike add_labels, this endpoint ' +
+            'takes ids only — CreateIssueOption.labels is []int64.',
         },
         assignees: {
           type: 'array',
