@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0](https://github.com/rubicon/forgejo-mcp/compare/v0.12.0...v0.13.0) (2026-08-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* list_directory returns { total_count, count, page, items } and fails on a path that names a file. Read the entries from items; use get_file_content for files.
+
+### Added
+
+* accept label names on add_labels, and make list_directory list directories ([#104](https://github.com/rubicon/forgejo-mcp/issues/104)) ([6b4e22f](https://github.com/rubicon/forgejo-mcp/commit/6b4e22f36983fcbf1dfc27833e9fa48395a27484)), closes [#101](https://github.com/rubicon/forgejo-mcp/issues/101)
+
 ## [Unreleased]
 
 Nothing yet.
