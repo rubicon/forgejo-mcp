@@ -185,8 +185,20 @@ tier is **off by default** and must be deliberately enabled by the operator.
 |------|------|-----------|
 | `merge_pull_request` | elevated | Merge a PR (`merge` / `rebase` / `squash`) into its base branch, pinned to a required `head_commit_id` |
 | `delete_branch` | elevated | Permanently delete a branch |
+| `create_repo` | elevated | Create a repository; private unless `private: false` is passed |
+| `delete_repo` | elevated | Permanently delete a repository; `confirm` must equal `owner/repo` |
 
 Each elevated tool's description is prefixed with `[ELEVATED — DESTRUCTIVE]`.
+
+`delete_repo` **requires** `confirm` to equal `owner/repo` exactly. Deleting a
+repository is the only operation here with no undo of any kind, and the double
+gate proves the operator enabled the tier, not that the caller knows which
+repository it is about to destroy.
+
+`create_repo` creates a **private** repository unless `private: false` is passed
+deliberately. A repository is the one thing an agent can create whose visibility
+it also chooses, which is what would make a public one a place to copy private
+content into.
 
 `merge_pull_request` **requires** `head_commit_id` — the head SHA from
 `get_pull_request`. Forgejo refuses the merge if the branch has moved since, so an

@@ -922,6 +922,65 @@ export const elevatedTools: ToolDefinition[] = [
       }),
   },
   {
+    name: 'create_repo',
+    description:
+      '[ELEVATED] Create a repository owned by the authenticated user. Private unless ' +
+      'private is explicitly false: a repository is the one thing whose visibility the ' +
+      'caller chooses, which makes a public one a place to copy private content into.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Repository name' },
+        description: { type: 'string', description: 'Short description' },
+        private: {
+          type: 'boolean',
+          default: true,
+          description: 'Visibility; omit for private. Pass false deliberately to publish it.',
+        },
+        auto_init: { type: 'boolean', description: 'Create an initial commit with a README' },
+        default_branch: { type: 'string', description: 'Name for the initial branch' },
+      },
+      required: ['name'],
+    },
+    handler: (c, a) =>
+      c.createRepo({
+        name: req(a, 'name'),
+        description: a.description,
+        private: a.private === false ? false : true,
+        auto_init: a.auto_init,
+        default_branch: a.default_branch,
+      }),
+  },
+  {
+    name: 'delete_repo',
+    description:
+      '[ELEVATED — DESTRUCTIVE] Permanently delete a repository, with its issues, pull ' +
+      'requests, and history. This cannot be undone by any means. confirm must equal ' +
+      'owner/repo exactly, so the repository being deleted has to be named, not inferred.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        confirm: {
+          type: 'string',
+          description: 'Must equal owner/repo exactly, naming the repository to delete',
+        },
+      },
+      required: ['owner', 'repo', 'confirm'],
+    },
+    handler: (c, a) => {
+      const owner = req<string>(a, 'owner');
+      const repo = req<string>(a, 'repo');
+      const target = `${owner}/${repo}`;
+      // The double gate proves the operator enabled the tier. It does not prove
+      // the caller knows which repository it is about to destroy.
+      if (req<string>(a, 'confirm') !== target) {
+        throw new Error(`confirm must be exactly "${target}" to delete it`);
+      }
+      return c.deleteRepo(owner, repo);
+    },
+  },
+  {
     name: 'delete_branch',
     description:
       '[ELEVATED — DESTRUCTIVE] Permanently delete a branch. This cannot be undone; ' +

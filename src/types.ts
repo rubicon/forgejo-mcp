@@ -33,6 +33,12 @@ export interface MergeResult {
   head_commit_id: string;
 }
 
+/** Outcome of deleting a repository; the endpoint answers 204 with no body. */
+export interface DeleteRepoResult {
+  deleted: boolean;
+  repository: string;
+}
+
 /** Outcome of removing a label; the endpoint answers 204 with no body. */
 export interface RemoveLabelResult {
   removed: boolean;

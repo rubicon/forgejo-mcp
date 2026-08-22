@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 // + get_pull_request_files (#85) + remove_label (#88) = 36 base tools; elevated
 // adds 2 more.
 const BASE_TOOLS = 36;
-const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch'];
+const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo'];
 const EXPECTED_NAMES = [
   'create_release',
   'list_releases',
@@ -468,6 +468,32 @@ async function checkRequestContract() {
         fail('contract: delete_branch must report the branch it deleted');
       }
 
+      // A repository is the one thing an agent can create whose visibility it also
+      // chooses, so private is the default and public must be asked for.
+      const madeRepo = await elevated.request('tools/call', {
+        name: 'create_repo',
+        arguments: { name: 'scratch-repo' },
+      });
+      if (madeRepo?.isError) fail(`contract: create_repo errored: ${madeRepo.content?.[0]?.text}`);
+
+      // Deleting a repository is the only operation here with no undo, so the
+      // caller must name what it is deleting.
+      for (const bad of [
+        { owner: 'o', repo: 'r' },
+        { owner: 'o', repo: 'r', confirm: 'r' },
+        { owner: 'o', repo: 'r', confirm: 'o/other' },
+      ]) {
+        const refused = await elevated.request('tools/call', { name: 'delete_repo', arguments: bad });
+        if (!refused?.isError) {
+          fail(`contract: delete_repo must refuse ${JSON.stringify(bad)}`);
+        }
+      }
+      const goneRepo = await elevated.request('tools/call', {
+        name: 'delete_repo',
+        arguments: { owner: 'o', repo: 'doomed', confirm: 'o/doomed' },
+      });
+      if (goneRepo?.isError) fail(`contract: delete_repo errored: ${goneRepo.content?.[0]?.text}`);
+
       // The destructive tier must refuse an unrecognised merge style rather than
       // let the API decide what it meant.
       const badStyle = await elevated.request('tools/call', {
@@ -542,6 +568,15 @@ async function checkRequestContract() {
   if (review.body?.event !== 'APPROVED') {
     fail(`contract: create_pull_request_review must forward the event verbatim, sent ${review.body?.event}`);
   }
+  const repoCreate = only('POST', '/api/v1/user/repos');
+  if (repoCreate.body?.private !== true) {
+    fail(`contract: create_repo must default to private, sent ${JSON.stringify(repoCreate.body)}`);
+  }
+  only('DELETE', '/api/v1/repos/o/doomed');
+  if (stub.received.some((e) => e.method === 'DELETE' && parsed(e).pathname === '/api/v1/repos/o/r')) {
+    fail('contract: a refused delete_repo must send no request');
+  }
+
   const branchDelete = only('DELETE', '/api/v1/repos/o/r/branches/dev%2F88-remove-label');
   if (!branchDelete) fail('contract: delete_branch must DELETE the encoded branch path');
 
