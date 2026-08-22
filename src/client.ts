@@ -286,14 +286,34 @@ export class ForgejoClient {
   }
 
   /** List a directory's entries. Omit `path` for the repository root. */
-  listContents(
+  /**
+   * List a directory's entries. The endpoint is polymorphic — it answers with a
+   * single object when the path names a file — so this refuses that case rather
+   * than returning a shape the caller could not predict before calling.
+   */
+  async listDirectory(
     owner: string,
     repo: string,
-    path?: string,
+    filepath?: string,
     ref?: string,
-  ): Promise<ContentsResponse[] | ContentsResponse> {
-    const suffix = path ? `/${ForgejoClient.filePath(path)}` : '';
-    return this.request(`${this.repoBase(owner, repo)}/contents${suffix}`, { query: { ref } });
+  ): Promise<Paginated<ContentsResponse>> {
+    const path = filepath ? `/${ForgejoClient.filePath(filepath)}` : '';
+    const response = await this.requestRaw(`${this.repoBase(owner, repo)}/contents${path}`, { ref });
+    const text = await response.text();
+    const items = text ? JSON.parse(text) : [];
+    if (!Array.isArray(items)) {
+      throw new Error(
+        `${filepath ?? '/'} is a ${(items as ContentsResponse).type ?? 'file'}, not a directory; ` +
+          'use get_file_content',
+      );
+    }
+    const total = Number(response.headers.get('x-total-count'));
+    return {
+      total_count: Number.isFinite(total) ? total : undefined,
+      count: items.length,
+      page: 1,
+      items,
+    };
   }
 
   /** Create a new file. `content` must already be base64-encoded. */
