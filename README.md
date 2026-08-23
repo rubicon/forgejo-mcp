@@ -220,7 +220,7 @@ agent should never be able to merge or delete anything. So the elevated tier is
 
 ### Enabling it — the double gate
 
-Elevated tools are registered **only when BOTH** of these are set:
+Elevated tools are registered **only when all three** of these hold:
 
 - `FORGEJO_MCP_ELEVATED=1` — an explicit opt-in flag, and
 - `FORGEJO_MCP_ELEVATED_TOKEN` — a token **distinct** from `FORGEJO_TOKEN`. This is
@@ -267,8 +267,10 @@ Therefore, when the elevated tier is on:
 
 - **Do NOT blanket-allow the whole server** (`mcp__forgejo`).
 - **Allowlist only the specific safe tools** you want to run autonomously
-  (e.g. `mcp__forgejo__create_issue`), and leave `merge_pull_request` /
-  `delete_branch` to require an explicit prompt each time.
+  (e.g. `mcp__forgejo__create_issue`), and leave every elevated tool —
+  `merge_pull_request`, `delete_branch`, `create_repo` and `delete_repo` —
+  prompting on every call. `delete_repo` should never be allowlisted at all: its
+  `confirm` argument catches a malformed call, not a misled one.
 
 The server cannot enforce the client's allowlist — distinct tool naming and this
 warning are the mitigation. Enabling elevated tools is a decision the operator

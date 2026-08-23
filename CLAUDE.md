@@ -36,7 +36,7 @@ in `src/index.ts`. Do not hardcode a version literal.
 
 See `ARCHITECTURE.md`. In brief: `src/index.ts` wires MCP over stdio;
 `src/client.ts` is the typed Forgejo REST client; `src/tools.ts` holds the tool
-definitions and handlers (36 base `tools` + 2 opt-in `elevatedTools`);
+definitions and handlers (36 base `tools` + 4 opt-in `elevatedTools`);
 `src/types.ts` has the API response shapes.
 esbuild bundles everything to a single `dist/index.js`. `scripts/smoke.mjs` is
 the only check.
@@ -54,11 +54,18 @@ the only check.
     visibility, so a public one is somewhere to copy private content to), and
     `delete_repo` (no undo by any means).
 
-    Note what this boundary is *not*: "writes to the default branch" would put
-    `create_file`, `update_file`, `create_release` and `create_tag` here, since
-    all four target the default branch when no branch is given. They stay in the
-    default surface deliberately — the damage is a recorded commit that `git`
-    can revert, which is the definition of visible and cheap to undo.
+    Note what this boundary is *not*: "writes to the default branch" would pull
+    in `create_file` and `update_file`, which target the default branch when no
+    branch is given. Those stay in the default surface deliberately — the damage
+    is a recorded commit and `git` can revert it.
+
+    `create_release` and `create_tag` also default to the default branch and are
+    also in the default surface, but on weaker grounds: they add rather than
+    destroy, yet **this server exposes no way to undo them**, because the delete
+    endpoints are not implemented. That asymmetry is known and tolerated while
+    the surface is additive-only there. If deletion of tags or releases is ever
+    added, revisit which tier all four belong to rather than assuming this
+    placement still holds.
     Double-gated and fail-closed. All three must hold or the surface is
     byte-identical to the default: `FORGEJO_MCP_ELEVATED=1`, a `FORGEJO_TOKEN`
     that is set, and a `FORGEJO_MCP_ELEVATED_TOKEN` that differs from it. Do not
