@@ -58,10 +58,11 @@ async function main(): Promise<void> {
   const byName = new Map(activeTools.map((tool) => [tool.name, tool]));
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: activeTools.map(({ name, description, inputSchema }) => ({
+    tools: activeTools.map(({ name, description, inputSchema, annotations }) => ({
       name,
       description,
       inputSchema,
+      annotations,
     })),
   }));
 
