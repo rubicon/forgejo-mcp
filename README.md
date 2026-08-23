@@ -10,11 +10,13 @@ whole server bundles to a single `dist/index.js` with no runtime framework.
 
 ## Security model
 
-The server exposes **read tools plus additive writes only** — creating issues,
-issue/PR comments, and pull requests. There are deliberately **no merge, delete,
-or admin tools** in the default surface. This keeps it safe for unattended use
-and caps the blast radius of the API token. Pair it with a least-privilege token
-(repository R/W, issue R/W, user Read).
+Tools are tiered by blast radius. The default surface is **reads plus writes
+whose damage is visible and cheap to undo**. There are deliberately **no merge,
+delete, or admin tools** in it: merging and deleting live behind an opt-in
+elevated tier, and user, organisation, permission, secret and token
+administration is not exposed at all, at any tier. This keeps the server safe for
+unattended use and caps the blast radius of the API token. Pair it with a
+least-privilege token (repository R/W, issue R/W, user Read).
 
 A small set of destructive operations is available behind an
 [opt-in, off-by-default elevated tier](#elevated-tier-opt-in-off-by-default).

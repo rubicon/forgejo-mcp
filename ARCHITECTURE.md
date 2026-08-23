@@ -22,7 +22,9 @@ framework and no persistent state.
 
 ## Two tiers
 
-The default surface is read tools plus additive writes. Destructive operations —
+The default surface is reads plus writes whose damage is visible and cheap to
+undo; a tool is placed by blast radius rather than by whether it only adds.
+Operations that destroy work or write to a default branch —
 `merge_pull_request` and `delete_branch` — live in a separate `elevatedTools`
 array that `src/index.ts` concatenates onto the registry **only** when both
 `FORGEJO_MCP_ELEVATED=1` and a distinct `FORGEJO_MCP_ELEVATED_TOKEN` are set.
