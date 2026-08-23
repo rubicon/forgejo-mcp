@@ -31,10 +31,38 @@ function resolveElevation(env: NodeJS.ProcessEnv): { active: boolean; token: str
     );
     return { active: false, token: '' };
   }
+  // Elevation is additive on top of the default surface, so without a default
+  // token there is no pair to be the second half of. Allowing it would produce
+  // the worst possible split: the destructive tools working while the safe ones
+  // fail on an unconfigured credential.
+  if (!(env.FORGEJO_TOKEN ?? '')) {
+    console.error(
+      '[forgejo-mcp] FORGEJO_MCP_ELEVATED=1 but FORGEJO_TOKEN is unset — elevated ' +
+        'tools will NOT be registered (fail closed). The elevated token is the second ' +
+        'half of a pair, not a replacement for the everyday one.',
+    );
+    return { active: false, token: '' };
+  }
+  // A second token that equals the first is not a second token. The point of the
+  // pair is blast radius: the everyday token is broad because it has to be, and
+  // the elevated one is meant to be narrow and separately revocable. Accepting
+  // them collapsed would give the appearance of a boundary with none of the
+  // substance, which is worse than no boundary because it gets trusted.
+  if (token === (env.FORGEJO_TOKEN ?? '')) {
+    console.error(
+      '[forgejo-mcp] FORGEJO_MCP_ELEVATED_TOKEN is identical to FORGEJO_TOKEN — ' +
+        'elevated tools will NOT be registered (fail closed). The elevated tier ' +
+        'exists to keep destructive operations off the everyday credential; mint a ' +
+        'separate, narrowly-scoped token.',
+    );
+    return { active: false, token: '' };
+  }
   console.error(
-    '[forgejo-mcp] ELEVATED TIER ACTIVE — destructive tools (merge_pull_request, ' +
-      'delete_branch) are registered. Do NOT blanket-allowlist this server; ' +
-      'allowlist only the specific safe tools you want to run without prompts.',
+    // Enumerated from the registry rather than restated, so a new elevated tool
+    // cannot be added without appearing in the warning an operator reads.
+    `[forgejo-mcp] ELEVATED TIER ACTIVE — ${elevatedTools.map((t) => t.name).join(', ')} ` +
+      'are registered. Do NOT blanket-allowlist this server; allowlist only the ' +
+      'specific safe tools you want to run without prompts.',
   );
   return { active: true, token };
 }

@@ -219,7 +219,9 @@ agent should never be able to merge or delete anything. So the elevated tier is
 Elevated tools are registered **only when BOTH** of these are set:
 
 - `FORGEJO_MCP_ELEVATED=1` — an explicit opt-in flag, and
-- `FORGEJO_MCP_ELEVATED_TOKEN` — a token **distinct** from `FORGEJO_TOKEN`.
+- `FORGEJO_MCP_ELEVATED_TOKEN` — a token **distinct** from `FORGEJO_TOKEN`. This is
+  checked, not merely asked for: if the two are identical the tier stays off and the
+  server logs why. A second token that equals the first is not a second token.
 
 The default `FORGEJO_TOKEN` **never** performs an elevated operation — elevated
 calls use `FORGEJO_MCP_ELEVATED_TOKEN` exclusively. Scope that token to only the

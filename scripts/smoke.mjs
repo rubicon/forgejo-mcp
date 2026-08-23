@@ -56,8 +56,15 @@ function fail(message) {
 // Resolves once the MCP handshake is complete; `close()` stops the server.
 function connect(env) {
   const server = spawn('node', [serverPath], {
-    stdio: ['pipe', 'pipe', 'inherit'],
+    stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, ...env },
+  });
+  // The startup warning is operator-facing safety output, so it is asserted like
+  // any other contract rather than trusted to stay in step with the tool list.
+  let stderr = '';
+  server.stderr.on('data', (chunk) => {
+    stderr += chunk.toString();
+    process.stderr.write(chunk);
   });
 
   const pending = new Map();
@@ -135,7 +142,7 @@ function connect(env) {
       clientInfo: { name: 'smoke', version: '0.0.0' },
     });
     notify('notifications/initialized');
-    return { request, close, version: init?.serverInfo?.version };
+    return { request, close, version: init?.serverInfo?.version, stderr: () => stderr };
   })().catch((error) => {
     close();
     throw error;
@@ -148,7 +155,7 @@ async function listTools(env) {
   try {
     const result = await rpc.request('tools/list', {});
     const tools = result?.tools ?? [];
-    return { tools, names: tools.map((t) => t.name), version: rpc.version };
+    return { tools, names: tools.map((t) => t.name), version: rpc.version, stderr: rpc.stderr() };
   } finally {
     rpc.close();
   }
@@ -779,8 +786,39 @@ try {
   }
   if (hasElevated(failClosed)) fail('fail-closed: elevated tools must be absent without a token');
 
+  // (b2) Flag set but the elevated token IS the default token → fail closed.
+  // A second token that equals the first is not a second token: the whole point
+  // is that the elevated credential is narrow and separately revocable.
+  const { names: sameToken } = await listTools({
+    FORGEJO_TOKEN: 'smoke-shared-token',
+    FORGEJO_MCP_ELEVATED: '1',
+    FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-shared-token',
+  });
+  if (sameToken.length !== BASE_TOOLS) {
+    fail(`same-token: expected ${BASE_TOOLS} tools, got ${sameToken.length}`);
+  }
+  if (hasElevated(sameToken)) {
+    fail('same-token: elevated tools must be absent when the elevated token equals FORGEJO_TOKEN');
+  }
+
+  // (b3) Elevated token set but no default token → fail closed. Elevation is
+  // additive on top of the base surface; without a default token there is no
+  // pair, and the destructive tools would be the only ones that worked.
+  const { names: noDefault } = await listTools({
+    FORGEJO_TOKEN: '',
+    FORGEJO_MCP_ELEVATED: '1',
+    FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-elevated-token',
+  });
+  if (noDefault.length !== BASE_TOOLS) {
+    fail(`no-default-token: expected ${BASE_TOOLS} tools, got ${noDefault.length}`);
+  }
+  if (hasElevated(noDefault)) {
+    fail('no-default-token: elevated tools must be absent when FORGEJO_TOKEN is unset');
+  }
+
   // (c) Both flag and distinct token set → elevated tools PRESENT.
-  const { names: on, tools: elevatedSurface } = await listTools({
+  const { names: on, tools: elevatedSurface, stderr: elevatedLog } = await listTools({
+    FORGEJO_TOKEN: 'smoke-default-token',
     FORGEJO_MCP_ELEVATED: '1',
     FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-elevated-token',
   });
@@ -788,6 +826,14 @@ try {
   if (on.length !== expectedOn) fail(`elevated: expected ${expectedOn} tools, got ${on.length}`);
   for (const name of ELEVATED_TOOLS) {
     if (!has(on, name)) fail(`elevated: expected tool ${name} to be registered`);
+  }
+
+  // An operator enabling the tier must be told the whole destructive surface, not
+  // a subset that drifted out of date when a tool was added.
+  for (const name of ELEVATED_TOOLS) {
+    if (!elevatedLog.includes(name)) {
+      fail(`elevated: the startup warning does not name ${name}`);
+    }
   }
 
   // Default surface must include the expected additive tools (release/tag, file).
@@ -804,7 +850,7 @@ try {
 
   console.log(
     `SMOKE OK: v${handshakeVersion}, default=${off.length} tools, ` +
-      `fail-closed=${failClosed.length}, elevated=${on.length} (${ELEVATED_TOOLS.join(', ')}). ` +
+      `fail-closed=${failClosed.length}, same-token=${sameToken.length}, no-default=${noDefault.length}, elevated=${on.length} (${ELEVATED_TOOLS.join(', ')}). ` +
       `Double gate + version verified; ${contractCalls} tool calls verified against a stub Forgejo.`,
   );
   process.exit(0);
