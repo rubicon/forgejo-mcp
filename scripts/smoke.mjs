@@ -217,8 +217,16 @@ const READ_ONLY = [
   'get_branch', 'list_commits', 'get_commit', 'list_releases', 'get_release', 'list_tags',
   'get_tag', 'list_pull_request_reviews', 'list_labels',
 ];
-// Destroys or overwrites state that cannot be recovered from this server.
-const DESTRUCTIVE = ['merge_pull_request', 'delete_branch', 'delete_repo'];
+// Not additive. The MCP definition of destructiveHint is "performs only additive
+// updates" when false, which is narrower than "irreversible": replacing a file,
+// removing a label and closing an issue all take something away, even though
+// only some of them are hard to undo. Severity lives in the description.
+const DESTRUCTIVE = [
+  'merge_pull_request', 'delete_branch', 'delete_repo',
+  'update_file', 'remove_label', 'set_issue_state',
+];
+// A repeat with the same arguments has no further effect.
+const IDEMPOTENT = ['add_labels', 'add_assignees', 'set_issue_state', 'request_pull_request_reviewers'];
 
 function checkAnnotations(tools, { elevated }) {
   for (const tool of tools) {
@@ -238,6 +246,11 @@ function checkAnnotations(tools, { elevated }) {
     const shouldDestroy = DESTRUCTIVE.includes(tool.name);
     if (!shouldRead && (a.destructiveHint === true) !== shouldDestroy) {
       fail(`annotations: ${tool.name} destructiveHint=${a.destructiveHint}, expected ${shouldDestroy}`);
+    }
+    // Retry safety: a client may repeat an idempotent call after a timeout.
+    const shouldRepeat = IDEMPOTENT.includes(tool.name);
+    if (!shouldRead && (a.idempotentHint === true) !== shouldRepeat) {
+      fail(`annotations: ${tool.name} idempotentHint=${a.idempotentHint}, expected ${shouldRepeat}`);
     }
   }
   const named = tools.map((t) => t.name);

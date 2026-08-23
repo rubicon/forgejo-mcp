@@ -388,7 +388,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'path', 'content', 'sha'],
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.updateFile(req(a, 'owner'), req(a, 'repo'), req(a, 'path'), {
         content: Buffer.from(req<string>(a, 'content'), 'utf-8').toString('base64'),
@@ -878,7 +878,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'state'],
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.setIssueState(
         req(a, 'owner'),
@@ -902,7 +902,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'label'],
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.removeLabel(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'label')),
   },
