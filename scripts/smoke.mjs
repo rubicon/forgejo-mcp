@@ -209,6 +209,48 @@ function schemaOf(tools, name) {
   return tool.inputSchema ?? {};
 }
 
+// Tools that only read. Everything else changes something.
+const READ_ONLY = [
+  'list_repositories', 'get_repository', 'list_issues', 'get_issue', 'list_issue_comments',
+  'get_file_content', 'list_directory', 'list_pull_requests', 'get_pull_request',
+  'get_pull_request_diff', 'get_pull_request_files', 'get_commit_status', 'list_branches',
+  'get_branch', 'list_commits', 'get_commit', 'list_releases', 'get_release', 'list_tags',
+  'get_tag', 'list_pull_request_reviews', 'list_labels',
+];
+// Destroys or overwrites state that cannot be recovered from this server.
+const DESTRUCTIVE = ['merge_pull_request', 'delete_branch', 'delete_repo'];
+
+function checkAnnotations(tools, { elevated }) {
+  for (const tool of tools) {
+    const a = tool.annotations;
+    if (!a) fail(`annotations: ${tool.name} carries none`);
+    // Every tool here calls a remote Forgejo instance.
+    if (a.openWorldHint !== true) {
+      fail(`annotations: ${tool.name} must set openWorldHint, got ${a.openWorldHint}`);
+    }
+    const shouldRead = READ_ONLY.includes(tool.name);
+    if ((a.readOnlyHint === true) !== shouldRead) {
+      fail(`annotations: ${tool.name} readOnlyHint=${a.readOnlyHint}, expected ${shouldRead}`);
+    }
+    if (shouldRead && a.destructiveHint === true) {
+      fail(`annotations: ${tool.name} reads but claims destructiveHint`);
+    }
+    const shouldDestroy = DESTRUCTIVE.includes(tool.name);
+    if (!shouldRead && (a.destructiveHint === true) !== shouldDestroy) {
+      fail(`annotations: ${tool.name} destructiveHint=${a.destructiveHint}, expected ${shouldDestroy}`);
+    }
+  }
+  const named = tools.map((t) => t.name);
+  for (const name of READ_ONLY) {
+    if (!named.includes(name)) fail(`annotations: expected read tool ${name} to be registered`);
+  }
+  if (elevated) {
+    for (const name of DESTRUCTIVE) {
+      if (!named.includes(name)) fail(`annotations: expected ${name} in the elevated surface`);
+    }
+  }
+}
+
 function checkToolSchemas(tools) {
   const review = schemaOf(tools, 'create_pull_request_review');
   const event = review.properties?.event?.enum ?? [];
@@ -737,6 +779,9 @@ try {
   // (d) Advertised schemas, then the requests the client actually sends.
   checkToolSchemas(defaultTools);
   checkElevatedSchemas(elevatedSurface);
+  // Over the wire, not just in the definitions: index.ts rebuilds each entry.
+  checkAnnotations(defaultTools, { elevated: false });
+  checkAnnotations(elevatedSurface, { elevated: true });
   const contractCalls = await checkRequestContract();
 
   console.log(

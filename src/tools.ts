@@ -7,7 +7,23 @@ export interface ToolDefinition {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  /**
+   * MCP tool annotations. Hints, not enforcement: a client uses them to decide
+   * what to surface or gate, and nothing here relies on a client honouring them.
+   */
+  annotations: ToolAnnotations;
   handler: (client: ForgejoClient, args: Record<string, any>) => Promise<unknown>;
+}
+
+interface ToolAnnotations {
+  /** The tool only reads; it changes nothing. */
+  readOnlyHint?: boolean;
+  /** The tool destroys or overwrites state this server cannot restore. */
+  destructiveHint?: boolean;
+  /** Repeating the call with the same arguments has no further effect. */
+  idempotentHint?: boolean;
+  /** The tool reaches a remote Forgejo instance rather than local state. */
+  openWorldHint?: boolean;
 }
 
 function req<T = any>(args: Record<string, any>, key: string): T {
@@ -131,6 +147,7 @@ export const tools: ToolDefinition[] = [
         ...pagination,
       },
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.listRepositories(a.username, { page: a.page, limit: a.limit }),
   },
   {
@@ -141,6 +158,7 @@ export const tools: ToolDefinition[] = [
       properties: { ...ownerRepo },
       required: ['owner', 'repo'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.getRepository(req(a, 'owner'), req(a, 'repo')),
   },
   {
@@ -180,6 +198,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listIssues(req(a, 'owner'), req(a, 'repo'), {
         state: maybeOneOf(a, 'state', FILTER_STATES),
@@ -208,6 +227,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.getIssue(req(a, 'owner'), req(a, 'repo'), req(a, 'index')),
   },
   {
@@ -234,6 +254,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'title'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.createIssue(req(a, 'owner'), req(a, 'repo'), {
         title: req(a, 'title'),
@@ -254,6 +275,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listIssueComments(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         page: a.page,
@@ -272,6 +294,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'body'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.createIssueComment(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'body')),
   },
@@ -288,6 +311,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'path'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: async (c, a) => {
       const file = await c.getFileContent(req(a, 'owner'), req(a, 'repo'), req(a, 'path'), a.ref);
       const decoded =
@@ -312,6 +336,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.listDirectory(req(a, 'owner'), req(a, 'repo'), a.path, a.ref),
   },
   {
@@ -332,6 +357,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'path', 'content'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.createFile(req(a, 'owner'), req(a, 'repo'), req(a, 'path'), {
         content: Buffer.from(req<string>(a, 'content'), 'utf-8').toString('base64'),
@@ -362,6 +388,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'path', 'content', 'sha'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.updateFile(req(a, 'owner'), req(a, 'repo'), req(a, 'path'), {
         content: Buffer.from(req<string>(a, 'content'), 'utf-8').toString('base64'),
@@ -397,6 +424,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listPullRequests(req(a, 'owner'), req(a, 'repo'), {
         state: maybeOneOf(a, 'state', FILTER_STATES),
@@ -419,6 +447,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.getPullRequest(req(a, 'owner'), req(a, 'repo'), req(a, 'index')),
   },
   {
@@ -432,6 +461,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.getPullRequestDiff(req(a, 'owner'), req(a, 'repo'), req(a, 'index')),
   },
   {
@@ -449,6 +479,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listPullRequestFiles(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         page: a.page,
@@ -469,6 +500,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'title', 'head', 'base'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.createPullRequest(req(a, 'owner'), req(a, 'repo'), {
         title: req(a, 'title'),
@@ -489,6 +521,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'ref'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.getCommitStatus(req(a, 'owner'), req(a, 'repo'), req(a, 'ref')),
   },
   {
@@ -502,6 +535,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listBranches(req(a, 'owner'), req(a, 'repo'), { page: a.page, limit: a.limit }),
   },
@@ -516,6 +550,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'branch'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.getBranch(req(a, 'owner'), req(a, 'repo'), req(a, 'branch')),
   },
   {
@@ -533,6 +568,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listCommits(req(a, 'owner'), req(a, 'repo'), {
         sha: a.sha,
@@ -552,6 +588,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'sha'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.getCommit(req(a, 'owner'), req(a, 'repo'), req(a, 'sha')),
   },
   {
@@ -571,6 +608,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'new_branch_name'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.createBranch(req(a, 'owner'), req(a, 'repo'), {
         new_branch_name: req(a, 'new_branch_name'),
@@ -588,6 +626,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listReleases(req(a, 'owner'), req(a, 'repo'), { page: a.page, limit: a.limit }),
   },
@@ -602,6 +641,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'id'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.getRelease(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
   },
   {
@@ -621,6 +661,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'tag_name'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.createRelease(req(a, 'owner'), req(a, 'repo'), {
         tag_name: req(a, 'tag_name'),
@@ -642,6 +683,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listTags(req(a, 'owner'), req(a, 'repo'), { page: a.page, limit: a.limit }),
   },
@@ -656,6 +698,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'tag'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) => c.getTag(req(a, 'owner'), req(a, 'repo'), req(a, 'tag')),
   },
   {
@@ -671,6 +714,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'tag_name'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.createTag(req(a, 'owner'), req(a, 'repo'), {
         tag_name: req(a, 'tag_name'),
@@ -691,6 +735,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listPullRequestReviews(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         page: a.page,
@@ -738,6 +783,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'event'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.createPullRequestReview(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         event: oneOf(a, 'event', REVIEW_EVENTS),
@@ -767,6 +813,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'reviewers'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.requestPullRequestReviewers(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         reviewers: req(a, 'reviewers'),
@@ -786,6 +833,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo'],
     },
+    annotations: { readOnlyHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.listLabels(req(a, 'owner'), req(a, 'repo'), { page: a.page, limit: a.limit }),
   },
@@ -807,6 +855,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'labels'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.addLabels(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'labels')),
   },
@@ -829,6 +878,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'state'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.setIssueState(
         req(a, 'owner'),
@@ -852,6 +902,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'label'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.removeLabel(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'label')),
   },
@@ -873,6 +924,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'assignees'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     handler: (c, a) =>
       c.addAssignees(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'assignees')),
   },
@@ -915,6 +967,7 @@ export const elevatedTools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'head_commit_id'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.mergePullRequest(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         style: maybeOneOf(a, 'style', MERGE_STYLES),
@@ -942,6 +995,7 @@ export const elevatedTools: ToolDefinition[] = [
       },
       required: ['name'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.createRepo({
         name: req(a, 'name'),
@@ -970,6 +1024,7 @@ export const elevatedTools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'confirm'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     handler: (c, a) => {
       const owner = req<string>(a, 'owner');
       const repo = req<string>(a, 'repo');
@@ -997,6 +1052,7 @@ export const elevatedTools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'branch'],
     },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     handler: (c, a) => c.deleteBranch(req(a, 'owner'), req(a, 'repo'), req(a, 'branch')),
   },
 ];
