@@ -794,6 +794,21 @@ try {
     fail('same-token: elevated tools must be absent when the elevated token equals FORGEJO_TOKEN');
   }
 
+  // (b3) Elevated token set but no default token → fail closed. Elevation is
+  // additive on top of the base surface; without a default token there is no
+  // pair, and the destructive tools would be the only ones that worked.
+  const { names: noDefault } = await listTools({
+    FORGEJO_TOKEN: '',
+    FORGEJO_MCP_ELEVATED: '1',
+    FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-elevated-token',
+  });
+  if (noDefault.length !== BASE_TOOLS) {
+    fail(`no-default-token: expected ${BASE_TOOLS} tools, got ${noDefault.length}`);
+  }
+  if (hasElevated(noDefault)) {
+    fail('no-default-token: elevated tools must be absent when FORGEJO_TOKEN is unset');
+  }
+
   // (c) Both flag and distinct token set → elevated tools PRESENT.
   const { names: on, tools: elevatedSurface } = await listTools({
     FORGEJO_TOKEN: 'smoke-default-token',
@@ -820,7 +835,7 @@ try {
 
   console.log(
     `SMOKE OK: v${handshakeVersion}, default=${off.length} tools, ` +
-      `fail-closed=${failClosed.length}, same-token=${sameToken.length}, elevated=${on.length} (${ELEVATED_TOOLS.join(', ')}). ` +
+      `fail-closed=${failClosed.length}, same-token=${sameToken.length}, no-default=${noDefault.length}, elevated=${on.length} (${ELEVATED_TOOLS.join(', ')}). ` +
       `Double gate + version verified; ${contractCalls} tool calls verified against a stub Forgejo.`,
   );
   process.exit(0);
