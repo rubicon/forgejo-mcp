@@ -779,8 +779,24 @@ try {
   }
   if (hasElevated(failClosed)) fail('fail-closed: elevated tools must be absent without a token');
 
+  // (b2) Flag set but the elevated token IS the default token → fail closed.
+  // A second token that equals the first is not a second token: the whole point
+  // is that the elevated credential is narrow and separately revocable.
+  const { names: sameToken } = await listTools({
+    FORGEJO_TOKEN: 'smoke-shared-token',
+    FORGEJO_MCP_ELEVATED: '1',
+    FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-shared-token',
+  });
+  if (sameToken.length !== BASE_TOOLS) {
+    fail(`same-token: expected ${BASE_TOOLS} tools, got ${sameToken.length}`);
+  }
+  if (hasElevated(sameToken)) {
+    fail('same-token: elevated tools must be absent when the elevated token equals FORGEJO_TOKEN');
+  }
+
   // (c) Both flag and distinct token set → elevated tools PRESENT.
   const { names: on, tools: elevatedSurface } = await listTools({
+    FORGEJO_TOKEN: 'smoke-default-token',
     FORGEJO_MCP_ELEVATED: '1',
     FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-elevated-token',
   });
@@ -804,7 +820,7 @@ try {
 
   console.log(
     `SMOKE OK: v${handshakeVersion}, default=${off.length} tools, ` +
-      `fail-closed=${failClosed.length}, elevated=${on.length} (${ELEVATED_TOOLS.join(', ')}). ` +
+      `fail-closed=${failClosed.length}, same-token=${sameToken.length}, elevated=${on.length} (${ELEVATED_TOOLS.join(', ')}). ` +
       `Double gate + version verified; ${contractCalls} tool calls verified against a stub Forgejo.`,
   );
   process.exit(0);

@@ -31,6 +31,20 @@ function resolveElevation(env: NodeJS.ProcessEnv): { active: boolean; token: str
     );
     return { active: false, token: '' };
   }
+  // A second token that equals the first is not a second token. The point of the
+  // pair is blast radius: the everyday token is broad because it has to be, and
+  // the elevated one is meant to be narrow and separately revocable. Accepting
+  // them collapsed would give the appearance of a boundary with none of the
+  // substance, which is worse than no boundary because it gets trusted.
+  if (token === (env.FORGEJO_TOKEN ?? '')) {
+    console.error(
+      '[forgejo-mcp] FORGEJO_MCP_ELEVATED_TOKEN is identical to FORGEJO_TOKEN — ' +
+        'elevated tools will NOT be registered (fail closed). The elevated tier ' +
+        'exists to keep destructive operations off the everyday credential; mint a ' +
+        'separate, narrowly-scoped token.',
+    );
+    return { active: false, token: '' };
+  }
   console.error(
     '[forgejo-mcp] ELEVATED TIER ACTIVE — destructive tools (merge_pull_request, ' +
       'delete_branch) are registered. Do NOT blanket-allowlist this server; ' +
