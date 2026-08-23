@@ -225,8 +225,13 @@ const DESTRUCTIVE = [
   'merge_pull_request', 'delete_branch', 'delete_repo',
   'update_file', 'remove_label', 'set_issue_state',
 ];
-// A repeat with the same arguments has no further effect.
-const IDEMPOTENT = ['add_labels', 'add_assignees', 'set_issue_state', 'request_pull_request_reviewers'];
+// A repeat with the same arguments has no further effect. Kept to the two where
+// the semantics are "set it to this", which the server can reason about without
+// a live instance. add_assignees reads and PATCHes a whole replacement list, so
+// a repeat can lose a concurrent update; request_pull_request_reviewers POSTs
+// and its remote side effects on a repeat are unverified. Advertising retry
+// safety that has not been demonstrated is worse than omitting the hint.
+const IDEMPOTENT = ['add_labels', 'set_issue_state'];
 
 function checkAnnotations(tools, { elevated }) {
   for (const tool of tools) {

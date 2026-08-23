@@ -813,7 +813,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'reviewers'],
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.requestPullRequestReviewers(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         reviewers: req(a, 'reviewers'),
@@ -924,7 +924,7 @@ export const tools: ToolDefinition[] = [
       },
       required: ['owner', 'repo', 'index', 'assignees'],
     },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     handler: (c, a) =>
       c.addAssignees(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), req(a, 'assignees')),
   },
