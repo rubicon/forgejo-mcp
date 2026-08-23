@@ -24,10 +24,11 @@ framework and no persistent state.
 
 The default surface is reads plus writes whose damage is visible and cheap to
 undo; a tool is placed by blast radius rather than by whether it only adds.
-Operations that destroy work or write to a default branch —
-`merge_pull_request` and `delete_branch` — live in a separate `elevatedTools`
-array that `src/index.ts` concatenates onto the registry **only** when both
-`FORGEJO_MCP_ELEVATED=1` and a distinct `FORGEJO_MCP_ELEVATED_TOKEN` are set.
+Operations whose damage cannot be undone from this server — `merge_pull_request`,
+`delete_branch`, `create_repo` and `delete_repo` — live in a separate
+`elevatedTools` array that `src/index.ts` concatenates onto the registry **only**
+when all three of these hold: `FORGEJO_MCP_ELEVATED=1`, a `FORGEJO_TOKEN` that is
+set, and a `FORGEJO_MCP_ELEVATED_TOKEN` that differs from it.
 With either missing the surface is byte-identical to the default, and the server
 logs why. `ForgejoClient.requestElevated` refuses to fall back to the default
 token, so an elevated call cannot run under the read/write credential even by

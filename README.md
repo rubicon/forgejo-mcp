@@ -167,8 +167,10 @@ mcp__forgejo
 ```
 
 **If you turn on the elevated tier, do _not_ do this** — a blanket allowlist
-would let `merge_pull_request` / `delete_branch` run without a prompt too.
-Allowlist only the specific safe tools instead, e.g.:
+would let every elevated tool run without a prompt: `merge_pull_request`,
+`delete_branch`, `create_repo` and `delete_repo`. Allowlist named default tools
+only, never an elevated one, and never `delete_repo` under any circumstances —
+its `confirm` argument catches a malformed call, not a misled one. For example:
 
 ```
 mcp__forgejo__create_issue
@@ -224,6 +226,9 @@ Elevated tools are registered **only when BOTH** of these are set:
 - `FORGEJO_MCP_ELEVATED_TOKEN` — a token **distinct** from `FORGEJO_TOKEN`. This is
   checked, not merely asked for: if the two are identical the tier stays off and the
   server logs why. A second token that equals the first is not a second token.
+- `FORGEJO_TOKEN` must itself be set. Elevation is additive on top of the default
+  surface, so without it the tier stays off rather than leaving the destructive
+  tools as the only ones that work.
 
 The default `FORGEJO_TOKEN` **never** performs an elevated operation — elevated
 calls use `FORGEJO_MCP_ELEVATED_TOKEN` exclusively. Scope that token to only the

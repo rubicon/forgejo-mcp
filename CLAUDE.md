@@ -48,8 +48,17 @@ the only check.
   - **Default surface** — reads, and writes whose damage is visible and cheap to
     undo. Editing an issue or pull request body belongs here for the same reason
     `update_file` does: the change is recorded and a person can see it.
-  - **Elevated tier** — operations that destroy work or write to a default
-    branch: `merge_pull_request`, `delete_branch`, `create_repo`, `delete_repo`.
+  - **Elevated tier** — operations whose damage cannot be undone from this
+    server: `merge_pull_request` (integrates code into a branch others build on),
+    `delete_branch` (may lose unmerged commits), `create_repo` (chooses its own
+    visibility, so a public one is somewhere to copy private content to), and
+    `delete_repo` (no undo by any means).
+
+    Note what this boundary is *not*: "writes to the default branch" would put
+    `create_file`, `update_file`, `create_release` and `create_tag` here, since
+    all four target the default branch when no branch is given. They stay in the
+    default surface deliberately — the damage is a recorded commit that `git`
+    can revert, which is the definition of visible and cheap to undo.
     Double-gated and fail-closed. All three must hold or the surface is
     byte-identical to the default: `FORGEJO_MCP_ELEVATED=1`, a `FORGEJO_TOKEN`
     that is set, and a `FORGEJO_MCP_ELEVATED_TOKEN` that differs from it. Do not
