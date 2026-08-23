@@ -56,8 +56,15 @@ function fail(message) {
 // Resolves once the MCP handshake is complete; `close()` stops the server.
 function connect(env) {
   const server = spawn('node', [serverPath], {
-    stdio: ['pipe', 'pipe', 'inherit'],
+    stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, ...env },
+  });
+  // The startup warning is operator-facing safety output, so it is asserted like
+  // any other contract rather than trusted to stay in step with the tool list.
+  let stderr = '';
+  server.stderr.on('data', (chunk) => {
+    stderr += chunk.toString();
+    process.stderr.write(chunk);
   });
 
   const pending = new Map();
@@ -135,7 +142,7 @@ function connect(env) {
       clientInfo: { name: 'smoke', version: '0.0.0' },
     });
     notify('notifications/initialized');
-    return { request, close, version: init?.serverInfo?.version };
+    return { request, close, version: init?.serverInfo?.version, stderr: () => stderr };
   })().catch((error) => {
     close();
     throw error;
@@ -148,7 +155,7 @@ async function listTools(env) {
   try {
     const result = await rpc.request('tools/list', {});
     const tools = result?.tools ?? [];
-    return { tools, names: tools.map((t) => t.name), version: rpc.version };
+    return { tools, names: tools.map((t) => t.name), version: rpc.version, stderr: rpc.stderr() };
   } finally {
     rpc.close();
   }
@@ -810,7 +817,7 @@ try {
   }
 
   // (c) Both flag and distinct token set → elevated tools PRESENT.
-  const { names: on, tools: elevatedSurface } = await listTools({
+  const { names: on, tools: elevatedSurface, stderr: elevatedLog } = await listTools({
     FORGEJO_TOKEN: 'smoke-default-token',
     FORGEJO_MCP_ELEVATED: '1',
     FORGEJO_MCP_ELEVATED_TOKEN: 'smoke-elevated-token',
@@ -819,6 +826,14 @@ try {
   if (on.length !== expectedOn) fail(`elevated: expected ${expectedOn} tools, got ${on.length}`);
   for (const name of ELEVATED_TOOLS) {
     if (!has(on, name)) fail(`elevated: expected tool ${name} to be registered`);
+  }
+
+  // An operator enabling the tier must be told the whole destructive surface, not
+  // a subset that drifted out of date when a tool was added.
+  for (const name of ELEVATED_TOOLS) {
+    if (!elevatedLog.includes(name)) {
+      fail(`elevated: the startup warning does not name ${name}`);
+    }
   }
 
   // Default surface must include the expected additive tools (release/tag, file).

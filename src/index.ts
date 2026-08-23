@@ -58,9 +58,11 @@ function resolveElevation(env: NodeJS.ProcessEnv): { active: boolean; token: str
     return { active: false, token: '' };
   }
   console.error(
-    '[forgejo-mcp] ELEVATED TIER ACTIVE — destructive tools (merge_pull_request, ' +
-      'delete_branch) are registered. Do NOT blanket-allowlist this server; ' +
-      'allowlist only the specific safe tools you want to run without prompts.',
+    // Enumerated from the registry rather than restated, so a new elevated tool
+    // cannot be added without appearing in the warning an operator reads.
+    `[forgejo-mcp] ELEVATED TIER ACTIVE — ${elevatedTools.map((t) => t.name).join(', ')} ` +
+      'are registered. Do NOT blanket-allowlist this server; allowlist only the ' +
+      'specific safe tools you want to run without prompts.',
   );
   return { active: true, token };
 }
