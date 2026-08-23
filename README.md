@@ -18,7 +18,8 @@ administration is not exposed at all, at any tier. This keeps the server safe fo
 unattended use and caps the blast radius of the API token. Pair it with a
 least-privilege token (repository R/W, issue R/W, user Read).
 
-A small set of destructive operations is available behind an
+A small set of high-blast-radius operations — destroying work, and creating a
+repository whose visibility the caller chooses — is available behind an
 [opt-in, off-by-default elevated tier](#elevated-tier-opt-in-off-by-default).
 With no elevated environment variables set, the tool surface is byte-identical
 to the safe default described above.
@@ -182,7 +183,9 @@ section below.
 
 ## Elevated tier (opt-in, off by default)
 
-The server can optionally expose a **minimal set of destructive tools**. This
+The server can optionally expose a **minimal set of high-blast-radius tools**:
+operations that destroy work, plus repository creation, where the caller chooses
+the visibility. This
 tier is **off by default** and must be deliberately enabled by the operator.
 
 | Tool | Kind | Operation |
