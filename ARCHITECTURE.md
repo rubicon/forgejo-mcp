@@ -42,8 +42,10 @@ The line is not "anything this server cannot undo". `create_release` and
 they cannot be undone through this server either. They stay because they add
 rather than destroy; the asymmetry is known, and if tag or release deletion is
 ever implemented the placement of all four should be revisited. `merge_pull_request` additionally requires
-`head_commit_id`, so a merge cannot be performed without first reading the pull
-request it merges.
+`head_commit_id`, which pins the merge to a specific head SHA so commits pushed
+after that SHA was read cannot be swept in. It is a freshness guard: nothing
+verifies the SHA came from `get_pull_request`, so it does not establish that
+anyone read the pull request.
 
 ## Two things the schema cannot do
 

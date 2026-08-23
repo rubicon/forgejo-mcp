@@ -14,7 +14,9 @@ Tools are tiered by blast radius. The default surface is **reads plus writes
 whose damage is visible and cheap to undo**. There are deliberately **no merge,
 delete, or admin tools** in it: merging and deleting live behind an opt-in
 elevated tier, and user, organisation, permission, secret and token
-administration is not exposed at all, at any tier. This keeps the server safe for
+administration is not exposed at all, at any tier. Repository *lifecycle* —
+creating and deleting repositories — is the exception: those exist, gated behind
+the elevated tier rather than permanently excluded. This keeps the server safe for
 unattended use and caps the blast radius of the API token. Pair it with a
 least-privilege token (repository R/W, issue R/W, user Read).
 
@@ -213,9 +215,11 @@ it also chooses, which is what would make a public one a place to copy private
 content into.
 
 `merge_pull_request` **requires** `head_commit_id` — the head SHA from
-`get_pull_request`. Forgejo refuses the merge if the branch has moved since, so an
-agent cannot merge a pull request it never read, nor commits pushed after the
-review it acted on.
+`get_pull_request`. Forgejo refuses the merge if the branch has moved since that
+SHA, so commits pushed after the review cannot be swept in. Be precise about what
+that is: a **freshness guard**, not proof of provenance. Nothing verifies the SHA
+came from reading the pull request, so it constrains *what* gets merged, not
+*whether anyone looked*. The per-call approval prompt is what covers the latter.
 
 ### Why it is gated so carefully
 
