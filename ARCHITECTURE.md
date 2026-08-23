@@ -24,9 +24,9 @@ framework and no persistent state.
 
 The default surface is reads plus writes whose damage is visible and cheap to
 undo; a tool is placed by blast radius rather than by whether it only adds.
-Operations whose damage cannot be undone from this server — `merge_pull_request`,
-`delete_branch`, `create_repo` and `delete_repo` — live in a separate
-`elevatedTools` array that `src/index.ts` concatenates onto the registry **only**
+Operations that destroy work or hand an agent a surface of its own choosing —
+`merge_pull_request`, `delete_branch`, `create_repo` and `delete_repo` — live in
+a separate `elevatedTools` array that `src/index.ts` concatenates onto the registry **only**
 when all three of these hold: `FORGEJO_MCP_ELEVATED=1`, a `FORGEJO_TOKEN` that is
 set, and a `FORGEJO_MCP_ELEVATED_TOKEN` that differs from it.
 With either missing the surface is byte-identical to the default, and the server
@@ -35,7 +35,13 @@ token, so an elevated call cannot run under the read/write credential even by
 mistake.
 
 The gate exists because this server hands tools to an agent that reads untrusted
-issue and pull request text. `merge_pull_request` additionally requires
+issue and pull request text.
+
+The line is not "anything this server cannot undo". `create_release` and
+`create_tag` are in the default surface and have no delete counterpart here, so
+they cannot be undone through this server either. They stay because they add
+rather than destroy; the asymmetry is known, and if tag or release deletion is
+ever implemented the placement of all four should be revisited. `merge_pull_request` additionally requires
 `head_commit_id`, so a merge cannot be performed without first reading the pull
 request it merges.
 

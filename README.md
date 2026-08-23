@@ -192,7 +192,10 @@ tier is **off by default** and must be deliberately enabled by the operator.
 | `create_repo` | elevated | Create a repository; private unless `private: false` is passed |
 | `delete_repo` | elevated | Permanently delete a repository; `confirm` must equal `owner/repo` |
 
-Each elevated tool's description is prefixed with `[ELEVATED — DESTRUCTIVE]`.
+Elevated tool descriptions are prefixed `[ELEVATED]`, and the ones that destroy
+something use `[ELEVATED — DESTRUCTIVE]`. `create_repo` carries the plain prefix:
+it is gated for choosing its own visibility, not for destroying anything, and its
+`destructiveHint` annotation is `false` to match.
 
 `delete_repo` **requires** `confirm` to equal `owner/repo` exactly. Be clear about
 what that buys: it catches a malformed or half-specified call, and nothing more.
