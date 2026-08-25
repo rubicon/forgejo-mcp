@@ -10,13 +10,18 @@ whole server bundles to a single `dist/index.js` with no runtime framework.
 
 ## Security model
 
-The server exposes **read tools plus additive writes only** — creating issues,
-issue/PR comments, and pull requests. There are deliberately **no merge, delete,
-or admin tools** in the default surface. This keeps it safe for unattended use
-and caps the blast radius of the API token. Pair it with a least-privilege token
-(repository R/W, issue R/W, user Read).
+Tools are tiered by blast radius. The default surface is **reads plus writes
+whose damage is visible and cheap to undo**. There are deliberately **no merge,
+delete, or admin tools** in it: merging and deleting live behind an opt-in
+elevated tier, and user, organisation, permission, secret and token
+administration is not exposed at all, at any tier. Repository *lifecycle* —
+creating and deleting repositories — is the exception: those exist, gated behind
+the elevated tier rather than permanently excluded. This keeps the server safe for
+unattended use and caps the blast radius of the API token. Pair it with a
+least-privilege token (repository R/W, issue R/W, user Read).
 
-A small set of destructive operations is available behind an
+A small set of high-blast-radius operations — destroying work, and creating a
+repository whose visibility the caller chooses — is available behind an
 [opt-in, off-by-default elevated tier](#elevated-tier-opt-in-off-by-default).
 With no elevated environment variables set, the tool surface is byte-identical
 to the safe default described above.
@@ -165,8 +170,10 @@ mcp__forgejo
 ```
 
 **If you turn on the elevated tier, do _not_ do this** — a blanket allowlist
-would let `merge_pull_request` / `delete_branch` run without a prompt too.
-Allowlist only the specific safe tools instead, e.g.:
+would let every elevated tool run without a prompt: `merge_pull_request`,
+`delete_branch`, `create_repo` and `delete_repo`. Allowlist named default tools
+only, never an elevated one, and never `delete_repo` under any circumstances —
+its `confirm` argument catches a malformed call, not a misled one. For example:
 
 ```
 mcp__forgejo__create_issue
@@ -178,7 +185,9 @@ section below.
 
 ## Elevated tier (opt-in, off by default)
 
-The server can optionally expose a **minimal set of destructive tools**. This
+The server can optionally expose a **minimal set of high-blast-radius tools**:
+operations that destroy work, plus repository creation, where the caller chooses
+the visibility. This
 tier is **off by default** and must be deliberately enabled by the operator.
 
 | Tool | Kind | Operation |
@@ -188,7 +197,10 @@ tier is **off by default** and must be deliberately enabled by the operator.
 | `create_repo` | elevated | Create a repository; private unless `private: false` is passed |
 | `delete_repo` | elevated | Permanently delete a repository; `confirm` must equal `owner/repo` |
 
-Each elevated tool's description is prefixed with `[ELEVATED — DESTRUCTIVE]`.
+Elevated tool descriptions are prefixed `[ELEVATED]`, and the ones that destroy
+something use `[ELEVATED — DESTRUCTIVE]`. `create_repo` carries the plain prefix:
+it is gated for choosing its own visibility, not for destroying anything, and its
+`destructiveHint` annotation is `false` to match.
 
 `delete_repo` **requires** `confirm` to equal `owner/repo` exactly. Be clear about
 what that buys: it catches a malformed or half-specified call, and nothing more.
@@ -203,9 +215,11 @@ it also chooses, which is what would make a public one a place to copy private
 content into.
 
 `merge_pull_request` **requires** `head_commit_id` — the head SHA from
-`get_pull_request`. Forgejo refuses the merge if the branch has moved since, so an
-agent cannot merge a pull request it never read, nor commits pushed after the
-review it acted on.
+`get_pull_request`. Forgejo refuses the merge if the branch has moved since that
+SHA, so commits pushed after the review cannot be swept in. Be precise about what
+that is: a **freshness guard**, not proof of provenance. Nothing verifies the SHA
+came from reading the pull request, so it constrains *what* gets merged, not
+*whether anyone looked*. The per-call approval prompt is what covers the latter.
 
 ### Why it is gated so carefully
 
@@ -216,12 +230,15 @@ agent should never be able to merge or delete anything. So the elevated tier is
 
 ### Enabling it — the double gate
 
-Elevated tools are registered **only when BOTH** of these are set:
+Elevated tools are registered **only when all three** of these hold:
 
 - `FORGEJO_MCP_ELEVATED=1` — an explicit opt-in flag, and
 - `FORGEJO_MCP_ELEVATED_TOKEN` — a token **distinct** from `FORGEJO_TOKEN`. This is
   checked, not merely asked for: if the two are identical the tier stays off and the
   server logs why. A second token that equals the first is not a second token.
+- `FORGEJO_TOKEN` must itself be set. Elevation is additive on top of the default
+  surface, so without it the tier stays off rather than leaving the destructive
+  tools as the only ones that work.
 
 The default `FORGEJO_TOKEN` **never** performs an elevated operation — elevated
 calls use `FORGEJO_MCP_ELEVATED_TOKEN` exclusively. Scope that token to only the
@@ -260,8 +277,10 @@ Therefore, when the elevated tier is on:
 
 - **Do NOT blanket-allow the whole server** (`mcp__forgejo`).
 - **Allowlist only the specific safe tools** you want to run autonomously
-  (e.g. `mcp__forgejo__create_issue`), and leave `merge_pull_request` /
-  `delete_branch` to require an explicit prompt each time.
+  (e.g. `mcp__forgejo__create_issue`), and leave every elevated tool —
+  `merge_pull_request`, `delete_branch`, `create_repo` and `delete_repo` —
+  prompting on every call. `delete_repo` should never be allowlisted at all: its
+  `confirm` argument catches a malformed call, not a misled one.
 
 The server cannot enforce the client's allowlist — distinct tool naming and this
 warning are the mitigation. Enabling elevated tools is a decision the operator

@@ -36,20 +36,59 @@ in `src/index.ts`. Do not hardcode a version literal.
 
 See `ARCHITECTURE.md`. In brief: `src/index.ts` wires MCP over stdio;
 `src/client.ts` is the typed Forgejo REST client; `src/tools.ts` holds the tool
-definitions and handlers (36 base `tools` + 2 opt-in `elevatedTools`);
+definitions and handlers (36 base `tools` + 4 opt-in `elevatedTools`);
 `src/types.ts` has the API response shapes.
 esbuild bundles everything to a single `dist/index.js`. `scripts/smoke.mjs` is
 the only check.
 
 ## Design constraints (do not violate)
 
-- Safe default surface = read tools plus additive writes only (issues, comments,
-  files, branches, releases/tags, pull requests). Destructive ops live in an
-  opt-in elevated tier (`merge_pull_request`, `delete_branch`) that is double-gated
-  and fail-closed: BOTH `FORGEJO_MCP_ELEVATED=1` and a distinct
-  `FORGEJO_MCP_ELEVATED_TOKEN` must be set, or the surface is byte-identical to the
-  default. Do not widen the elevated tier or relax the gate without explicit owner
-  sign-off and a token-scope review. Never blanket-allowlist this server.
+- **Tools are tiered by blast radius, not by whether a write is additive.**
+
+  - **Default surface** — reads, and writes whose damage is visible and cheap to
+    undo. Editing an issue or pull request body belongs here for the same reason
+    `update_file` does: the change is recorded and a person can see it.
+  - **Elevated tier** — operations whose damage cannot be undone from this
+    server: `merge_pull_request` (integrates code into a branch others build on),
+    `delete_branch` (may lose unmerged commits), `create_repo` (chooses its own
+    visibility, so a public one is somewhere to copy private content to), and
+    `delete_repo` (no undo by any means).
+
+    Note what this boundary is *not*: "writes to the default branch" would pull
+    in `create_file` and `update_file`, which target the default branch when no
+    branch is given. Those stay in the default surface deliberately — the damage
+    is a recorded commit and `git` can revert it.
+
+    `create_release` and `create_tag` also default to the default branch and are
+    also in the default surface, but on weaker grounds: they add rather than
+    destroy, yet **this server exposes no way to undo them**, because the delete
+    endpoints are not implemented. That asymmetry is known and tolerated while
+    the surface is additive-only there. If deletion of tags or releases is ever
+    added, revisit which tier all four belong to rather than assuming this
+    placement still holds.
+    Double-gated and fail-closed. All three must hold or the surface is
+    byte-identical to the default: `FORGEJO_MCP_ELEVATED=1`, a `FORGEJO_TOKEN`
+    that is set, and a `FORGEJO_MCP_ELEVATED_TOKEN` that differs from it. Do not
+    widen this tier or relax the gate without explicit owner sign-off and a
+    token-scope review. Never blanket-allowlist this server, and never allowlist
+    `delete_repo` at all — its `confirm` argument catches a malformed call, not a
+    misled one.
+  - **Never exposed** — user and organisation administration, permissions,
+    secrets, tokens. Not a coverage gap; permanently out of scope however
+    complete the rest becomes.
+
+  This replaced an earlier rule reading "read tools plus additive writes only".
+  That rule had already eroded: `set_issue_state` closes issues, `remove_label`
+  takes labels off, and `update_file` overwrites file content. It was still being
+  used to exclude issue and pull request body edits while a blunter operation
+  shipped in the same tier, which is not a line that can be defended. Do not
+  restore it as a correction.
+
+- **Coverage goal: the issue, pull request and repository workflow surface.**
+  The repo-scoped API is roughly 145 paths and 250 operations; this server
+  deliberately covers a fraction. The long tail — stopwatches, time tracking,
+  reactions, pinning, subscriptions, dependencies — is demand-driven, so
+  "complete coverage" means the workflow, not 250 tools.
 - The token and base URL are supplied at runtime via `FORGEJO_TOKEN` and
   `FORGEJO_BASE_URL`. Never hardcode a token in the repo, configs, or tests. Use
   a least-privilege token (repository R/W, issue R/W, user Read).
