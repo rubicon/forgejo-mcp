@@ -949,7 +949,10 @@ export const elevatedTools: ToolDefinition[] = [
       'writes to the default branch and cannot be undone from here. Style is one ' +
       'of merge (default), rebase, or squash. head_commit_id pins the merge to the ' +
       'commit you reviewed (take it from get_pull_request): if the branch has been ' +
-      'pushed to since, the merge fails instead of merging code nobody looked at.',
+      'pushed to since, the merge fails instead of merging code nobody looked at. ' +
+      'Pass delete_branch_after_merge to clean up the head branch: the repository ' +
+      "setting of that name is only the web UI checkbox's default and does not apply " +
+      'to an API merge, so without this flag the branch is always left behind.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -964,6 +967,13 @@ export const elevatedTools: ToolDefinition[] = [
           enum: MERGE_STYLES,
           description: 'Merge strategy (default: merge)',
         },
+        delete_branch_after_merge: {
+          type: 'boolean',
+          description:
+            'Delete the head branch once the merge succeeds (default: false). The ' +
+            "repository's own delete-branch-after-merge setting does not apply here — " +
+            'it sets the web UI checkbox default, not the API default.',
+        },
       },
       required: ['owner', 'repo', 'index', 'head_commit_id'],
     },
@@ -972,6 +982,7 @@ export const elevatedTools: ToolDefinition[] = [
       c.mergePullRequest(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         style: maybeOneOf(a, 'style', MERGE_STYLES),
         head_commit_id: req(a, 'head_commit_id'),
+        delete_branch_after_merge: a.delete_branch_after_merge,
       }),
   },
   {

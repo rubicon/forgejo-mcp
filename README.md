@@ -192,7 +192,7 @@ tier is **off by default** and must be deliberately enabled by the operator.
 
 | Tool | Kind | Operation |
 |------|------|-----------|
-| `merge_pull_request` | elevated | Merge a PR (`merge` / `rebase` / `squash`) into its base branch, pinned to a required `head_commit_id` |
+| `merge_pull_request` | elevated | Merge a PR (`merge` / `rebase` / `squash`) into its base branch, pinned to a required `head_commit_id`; pass `delete_branch_after_merge` to clean up the head branch |
 | `delete_branch` | elevated | Permanently delete a branch |
 | `create_repo` | elevated | Create a repository; private unless `private: false` is passed |
 | `delete_repo` | elevated | Permanently delete a repository; `confirm` must equal `owner/repo` |

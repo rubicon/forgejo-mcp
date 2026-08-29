@@ -348,6 +348,13 @@ function checkElevatedSchemas(tools) {
   if (!(merge.required ?? []).includes('head_commit_id')) {
     fail('schema: merge_pull_request must require head_commit_id');
   }
+  // The repository's own delete-branch-after-merge setting is only the web UI
+  // checkbox default; an API merge that omits the flag leaves the branch. Without
+  // this parameter a caller has no way to ask, and the leftover branch reads as a
+  // broken repository setting rather than an unsent field.
+  if (!merge.properties?.delete_branch_after_merge) {
+    fail('schema: merge_pull_request must expose delete_branch_after_merge');
+  }
 }
 
 // Drive real tools/call requests through the built server into a stub Forgejo,
@@ -499,7 +506,14 @@ async function checkRequestContract() {
     try {
       const result = await elevated.request('tools/call', {
         name: 'merge_pull_request',
-        arguments: { owner: 'o', repo: 'r', index: 9, style: 'squash', head_commit_id: 'feedface' },
+        arguments: {
+          owner: 'o',
+          repo: 'r',
+          index: 9,
+          style: 'squash',
+          head_commit_id: 'feedface',
+          delete_branch_after_merge: true,
+        },
       });
       if (result?.isError) {
         fail(`contract: merge_pull_request returned an error: ${result.content?.[0]?.text ?? '(no text)'}`);
@@ -520,6 +534,14 @@ async function checkRequestContract() {
       const defaulted = stub.received.find((entry) => entry.url.includes('/pulls/11/merge'));
       if (defaulted?.body?.Do !== 'merge') {
         fail(`contract: an omitted style must default to merge, sent ${defaulted?.body?.Do}`);
+      }
+      // Deleting a branch nobody asked to delete is the failure that matters more
+      // than not deleting one, so the omitted case must stay false.
+      if (defaulted?.body?.delete_branch_after_merge) {
+        fail(
+          'contract: an omitted delete_branch_after_merge must not request deletion, sent ' +
+            `${defaulted?.body?.delete_branch_after_merge}`,
+        );
       }
 
       // The other destructive tool. dev/88-slug is this repo's own branch naming,
@@ -756,6 +778,13 @@ async function checkRequestContract() {
     fail(
       'contract: merge_pull_request must forward head_commit_id so the merge is pinned to the ' +
         `reviewed head, sent ${merge.body?.head_commit_id}`,
+    );
+  }
+
+  if (merge.body?.delete_branch_after_merge !== true) {
+    fail(
+      'contract: merge_pull_request must forward delete_branch_after_merge, or every merged ' +
+        `branch is silently left behind, sent ${merge.body?.delete_branch_after_merge}`,
     );
   }
 

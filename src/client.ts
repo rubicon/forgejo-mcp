@@ -477,12 +477,16 @@ export class ForgejoClient {
     owner: string,
     repo: string,
     index: number,
-    opts: { style?: MergeStyle; head_commit_id: string },
+    opts: { style?: MergeStyle; head_commit_id: string; delete_branch_after_merge?: boolean },
   ): Promise<MergeResult> {
     const strategy = opts.style ?? 'merge';
     await this.requestElevated(`${this.repoBase(owner, repo)}/pulls/${index}/merge`, {
       method: 'POST',
-      body: { Do: strategy, head_commit_id: opts.head_commit_id },
+      body: {
+        Do: strategy,
+        head_commit_id: opts.head_commit_id,
+        delete_branch_after_merge: opts.delete_branch_after_merge,
+      },
     });
     return { merged: true, index, strategy, head_commit_id: opts.head_commit_id };
   }
