@@ -14,8 +14,9 @@ import { fileURLToPath } from 'node:url';
 
 // 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
 // + get_pull_request_files (#85) + remove_label (#88) + edit_issue (#123)
-// + 5 milestone tools (#124) = 42 base tools; elevated adds 2 more.
-const BASE_TOOLS = 42;
+// + 5 milestone tools (#124) + 2 comment tools (#125) = 44 base tools;
+// elevated adds 2 more.
+const BASE_TOOLS = 44;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -47,6 +48,8 @@ const EXPECTED_NAMES = [
   'create_milestone',
   'edit_milestone',
   'delete_milestone',
+  'edit_issue_comment',
+  'delete_issue_comment',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -237,7 +240,7 @@ const READ_ONLY = [
 const DESTRUCTIVE = [
   'merge_pull_request', 'delete_branch', 'delete_repo',
   'update_file', 'remove_label', 'set_issue_state', 'edit_issue',
-  'edit_milestone', 'delete_milestone',
+  'edit_milestone', 'delete_milestone', 'edit_issue_comment', 'delete_issue_comment',
 ];
 // A repeat with the same arguments has no further effect. Kept to the three
 // where the semantics are "set it to this", which the server can reason about
@@ -245,7 +248,9 @@ const DESTRUCTIVE = [
 // list, so a repeat can lose a concurrent update; request_pull_request_reviewers
 // POSTs and its remote side effects on a repeat are unverified. Advertising
 // retry safety that has not been demonstrated is worse than omitting the hint.
-const IDEMPOTENT = ['add_labels', 'set_issue_state', 'edit_issue', 'edit_milestone'];
+const IDEMPOTENT = [
+  'add_labels', 'set_issue_state', 'edit_issue', 'edit_milestone', 'edit_issue_comment',
+];
 
 function checkAnnotations(tools, { elevated }) {
   for (const tool of tools) {
@@ -382,6 +387,20 @@ function checkToolSchemas(tools) {
     fail(`schema: edit_milestone must require only owner, repo and id, got [${msEdit}]`);
   }
 
+  // A comment id is unique within the repository, so the issue number adds an
+  // argument that can only be got wrong. Keying on the id alone is what makes
+  // the id returned by list_issue_comments directly usable.
+  const commentEdit = schemaOf(tools, 'edit_issue_comment');
+  if (commentEdit.properties?.index) {
+    fail('schema: edit_issue_comment must not take an issue index — the comment id is enough');
+  }
+  if ((commentEdit.required ?? []).join(',') !== 'owner,repo,id,body') {
+    fail(`schema: edit_issue_comment must require owner, repo, id and body, got [${commentEdit.required}]`);
+  }
+  if (schemaOf(tools, 'delete_issue_comment').properties?.index) {
+    fail('schema: delete_issue_comment must not take an issue index');
+  }
+
   const update = schemaOf(tools, 'update_file');
   if (!(update.required ?? []).includes('sha')) {
     fail('schema: update_file must require sha (the API rejects an update without it)');
@@ -464,6 +483,8 @@ async function checkRequestContract() {
         ],
         ['edit_milestone', { owner: 'o', repo: 'r', id: 9, description: 'only this' }],
         ['delete_milestone', { owner: 'o', repo: 'r', id: 8 }],
+        ['edit_issue_comment', { owner: 'o', repo: 'r', id: 77, body: 'corrected text' }],
+        ['delete_issue_comment', { owner: 'o', repo: 'r', id: 78 }],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
         if (result?.isError) {
@@ -863,6 +884,23 @@ async function checkRequestContract() {
   }
   if (!only('DELETE', '/api/v1/repos/o/r/milestones/8')) {
     fail('contract: delete_milestone must DELETE the milestone path');
+  }
+
+  const commentEdited = only('PATCH', '/api/v1/repos/o/r/issues/comments/77');
+  if (commentEdited.body?.body !== 'corrected text') {
+    fail(`contract: edit_issue_comment must PATCH the new body, sent ${JSON.stringify(commentEdited.body)}`);
+  }
+  if (Object.keys(commentEdited.body ?? {}).join(',') !== 'body') {
+    fail(
+      'contract: edit_issue_comment must send body and nothing else, sent ' +
+        Object.keys(commentEdited.body ?? {}).join(','),
+    );
+  }
+  // The comment endpoints hang off /issues/comments/{id}, not /issues/{index}/
+  // comments/{id}: an issue number in the path would 404 for a comment whose
+  // issue the caller guessed wrong.
+  if (!only('DELETE', '/api/v1/repos/o/r/issues/comments/78')) {
+    fail('contract: delete_issue_comment must DELETE the repository-scoped comment path');
   }
 
   const files = only('GET', '/api/v1/repos/o/r/pulls/21/files');

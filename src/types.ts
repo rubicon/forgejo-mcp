@@ -50,6 +50,11 @@ export interface Milestone {
   due_on: string | null;
 }
 
+export interface DeleteCommentResult {
+  deleted: boolean;
+  id: number;
+}
+
 export interface DeleteMilestoneResult {
   deleted: boolean;
   id: string | number;
