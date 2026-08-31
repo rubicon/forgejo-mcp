@@ -4,7 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Nothing yet.
+
 ## [0.15.0](https://github.com/rubicon/forgejo-mcp/compare/v0.14.0...v0.15.0) (2026-08-31)
+
+Since the first release this server could attach a milestone without being able to tell you which milestones existed, post a comment without being able to correct a typo in it, and write a file it had no way to remove. Twenty tools later, all three are closed, and the surface stops asking callers for identifiers it refused to hand out. The more useful find was in the check rather than the code: swapping the elevated token for the everyday one passed the whole suite, on a tool that had shipped in that tier since #106. The stub now records which credential actually arrives, so the trust boundary is asserted rather than assumed. Deleting a label, a release or a tag is elevated, because none of the three can be undone from here.
 
 
 ### Added
@@ -17,6 +23,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 * **tools:** add milestone tools ([#132](https://github.com/rubicon/forgejo-mcp/issues/132)) ([d6223e3](https://github.com/rubicon/forgejo-mcp/commit/d6223e31a56dce3638dd959489b47e5c6a40356a)), closes [#124](https://github.com/rubicon/forgejo-mcp/issues/124)
 * **tools:** add release reads, edit_release, and elevated release and tag deletion ([#137](https://github.com/rubicon/forgejo-mcp/issues/137)) ([631543c](https://github.com/rubicon/forgejo-mcp/commit/631543ceb5fecb737a4dad10145d5534f9e2b945)), closes [#129](https://github.com/rubicon/forgejo-mcp/issues/129)
 * **tools:** let merge_pull_request request head-branch deletion ([#121](https://github.com/rubicon/forgejo-mcp/issues/121)) ([3b8d856](https://github.com/rubicon/forgejo-mcp/commit/3b8d856686671c0c5ce070b79e82f41459297bd2)), closes [#120](https://github.com/rubicon/forgejo-mcp/issues/120)
+
+The default surface goes from 36 tools to 53.
+
+### Elevated tier
+
+The opt-in tier goes from four tools to seven. `delete_label`, `delete_release` and `delete_tag` join `merge_pull_request`, `delete_branch`, `create_repo` and `delete_repo`. Each was placed there on the same test as the rest of the tier, which is whether the damage can be undone from this server: a deleted label is stripped from every issue that carried it, release notes and assets never existed in git, and a tag may be the only pointer to its commits.
+
+The double gate is unchanged. Nothing in this tier registers unless `FORGEJO_MCP_ELEVATED=1`, `FORGEJO_TOKEN` is set, and `FORGEJO_MCP_ELEVATED_TOKEN` differs from it.
+
+### Verification
+
+The smoke check now records the `Authorization` header on every stub request and asserts that elevated tools travel on the elevated token while default tools do not. Before this release that boundary was invisible to the check, so an elevated tool running under the everyday credential would have passed. It also drives 44 real tool calls against a stub Forgejo, up from 23.
+
+### Known limitations
+
+The token-scope review this project requires whenever the elevated tier widens has not been done for `create_repo`, `delete_repo`, `delete_label`, `delete_release` or `delete_tag`. Separately, `create_repo` fails against a live instance when the token lacks `write:user`.
 
 ## [0.14.0](https://github.com/rubicon/forgejo-mcp/compare/v0.13.0...v0.14.0) (2026-08-23)
 
@@ -41,10 +63,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 * accept label names on add_labels, and make list_directory list directories ([#104](https://github.com/rubicon/forgejo-mcp/issues/104)) ([6b4e22f](https://github.com/rubicon/forgejo-mcp/commit/6b4e22f36983fcbf1dfc27833e9fa48395a27484)), closes [#101](https://github.com/rubicon/forgejo-mcp/issues/101)
-
-## [Unreleased]
-
-Nothing yet.
 
 ## [0.12.0](https://github.com/rubicon/forgejo-mcp/compare/v0.11.0...v0.12.0) (2026-08-20)
 
