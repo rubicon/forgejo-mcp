@@ -1081,6 +1081,74 @@ export const tools: ToolDefinition[] = [
     handler: (c, a) => c.deleteMilestone(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
   },
   {
+    name: 'get_release_by_tag',
+    description:
+      'Get a release by its tag name rather than its numeric id, which is what you ' +
+      'have when working from a version string.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        tag: { type: 'string', description: 'Tag name the release was cut from' },
+      },
+      required: ['owner', 'repo', 'tag'],
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    handler: (c, a) => c.getReleaseByTag(req(a, 'owner'), req(a, 'repo'), req(a, 'tag')),
+  },
+  {
+    name: 'get_latest_release',
+    description:
+      'Get the most recent non-draft, non-prerelease release. Answers "what is ' +
+      'currently released" without paging through list_releases.',
+    inputSchema: {
+      type: 'object',
+      properties: { ...ownerRepo },
+      required: ['owner', 'repo'],
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    handler: (c, a) => c.getLatestRelease(req(a, 'owner'), req(a, 'repo')),
+  },
+  {
+    name: 'edit_release',
+    description:
+      'Edit a release: its notes, name, tag, draft or prerelease flags. Only the ' +
+      'fields you pass change. Publishing a draft or flipping prerelease is done ' +
+      'here. The new text replaces the old and there is no guard against a ' +
+      'simultaneous edit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: 'number', description: 'Release id (see list_releases)' },
+        tag_name: { type: 'string', description: 'Replacement tag name' },
+        target_commitish: { type: 'string', description: 'Branch or commit the tag points at' },
+        name: { type: 'string', description: 'Replacement release title' },
+        body: { type: 'string', description: 'Replacement release notes in Markdown' },
+        draft: { type: 'boolean', description: 'Whether the release is a draft' },
+        prerelease: { type: 'boolean', description: 'Whether the release is a prerelease' },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    handler: (c, a) => {
+      const edit = {
+        tag_name: a.tag_name,
+        target_commitish: a.target_commitish,
+        name: a.name,
+        body: a.body,
+        draft: a.draft,
+        prerelease: a.prerelease,
+      };
+      if (Object.values(edit).every((value) => value === undefined)) {
+        throw new Error(
+          'edit_release needs at least one of tag_name, target_commitish, name, body, draft or prerelease.',
+        );
+      }
+      return c.editRelease(req(a, 'owner'), req(a, 'repo'), req(a, 'id'), edit);
+    },
+  },
+  {
     name: 'get_label',
     description: 'Get one label definition by id (name, colour, description).',
     inputSchema: {
@@ -1424,6 +1492,42 @@ export const elevatedTools: ToolDefinition[] = [
       }
       return c.deleteRepo(owner, repo);
     },
+  },
+  {
+    name: 'delete_release',
+    description:
+      '[ELEVATED — DESTRUCTIVE] Permanently delete a release. The notes and any ' +
+      'uploaded assets live in the forge rather than in git, so nothing here or in a ' +
+      'clone can bring them back. The underlying tag is left in place; delete_tag ' +
+      'removes that separately.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: 'number', description: 'Release id to delete (see list_releases)' },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    handler: (c, a) => c.deleteRelease(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
+  },
+  {
+    name: 'delete_tag',
+    description:
+      '[ELEVATED — DESTRUCTIVE] Permanently delete a tag. If the tagged commits are ' +
+      'not reachable from any branch, the tag was the only pointer to them and ' +
+      'deleting it orphans them, which is the same risk delete_branch carries. A ' +
+      'release cut from the tag is not deleted with it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        tag: { type: 'string', description: 'Tag name to delete' },
+      },
+      required: ['owner', 'repo', 'tag'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    handler: (c, a) => c.deleteTag(req(a, 'owner'), req(a, 'repo'), req(a, 'tag')),
   },
   {
     name: 'delete_label',
