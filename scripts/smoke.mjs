@@ -14,9 +14,9 @@ import { fileURLToPath } from 'node:url';
 
 // 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
 // + get_pull_request_files (#85) + remove_label (#88) + edit_issue (#123)
-// + 5 milestone tools (#124) + 2 comment tools (#125) = 44 base tools;
-// elevated adds 2 more.
-const BASE_TOOLS = 44;
+// + 5 milestone tools (#124) + 2 comment tools (#125) + 2 commit-status tools
+// (#126) = 46 base tools; elevated adds 2 more.
+const BASE_TOOLS = 46;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -50,6 +50,8 @@ const EXPECTED_NAMES = [
   'delete_milestone',
   'edit_issue_comment',
   'delete_issue_comment',
+  'create_commit_status',
+  'list_commit_statuses',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -232,6 +234,7 @@ const READ_ONLY = [
   'get_pull_request_diff', 'get_pull_request_files', 'get_commit_status', 'list_branches',
   'get_branch', 'list_commits', 'get_commit', 'list_releases', 'get_release', 'list_tags',
   'get_tag', 'list_pull_request_reviews', 'list_labels', 'list_milestones', 'get_milestone',
+  'list_commit_statuses',
 ];
 // Not additive. The MCP definition of destructiveHint is "performs only additive
 // updates" when false, which is narrower than "irreversible": replacing a file,
@@ -401,6 +404,21 @@ function checkToolSchemas(tools) {
     fail('schema: delete_issue_comment must not take an issue index');
   }
 
+  // The state vocabulary is Forgejo's CommitStatusState, which the swagger
+  // documents in prose rather than as an enum: pending, success, error, failure,
+  // warning. A value outside it is rejected by the API, so catch it here.
+  const statusState = schemaOf(tools, 'create_commit_status').properties?.state ?? {};
+  const stateNames = (statusState.enum ?? []).slice().sort().join(',');
+  if (stateNames !== 'error,failure,pending,success,warning') {
+    fail(`schema: create_commit_status state enum must be the CommitStatusState set, got [${statusState.enum}]`);
+  }
+  const statusRequired = schemaOf(tools, 'create_commit_status').required ?? [];
+  for (const key of ['sha', 'state', 'context']) {
+    if (!statusRequired.includes(key)) {
+      fail(`schema: create_commit_status must require ${key}, got [${statusRequired}]`);
+    }
+  }
+
   const update = schemaOf(tools, 'update_file');
   if (!(update.required ?? []).includes('sha')) {
     fail('schema: update_file must require sha (the API rejects an update without it)');
@@ -485,6 +503,14 @@ async function checkRequestContract() {
         ['delete_milestone', { owner: 'o', repo: 'r', id: 8 }],
         ['edit_issue_comment', { owner: 'o', repo: 'r', id: 77, body: 'corrected text' }],
         ['delete_issue_comment', { owner: 'o', repo: 'r', id: 78 }],
+        [
+          'create_commit_status',
+          {
+            owner: 'o', repo: 'r', sha: 'abc123', state: 'success', context: 'smoke/ci',
+            description: 'all green', target_url: 'https://example.invalid/run/1',
+          },
+        ],
+        ['list_commit_statuses', { owner: 'o', repo: 'r', ref: 'v1.0/rc', page: 2, limit: 6 }],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
         if (result?.isError) {
@@ -499,6 +525,11 @@ async function checkRequestContract() {
       for (const [name, args, marker] of [
         ['set_issue_state', { owner: 'o', repo: 'r', index: 13, state: 'deleted' }, '/issues/13'],
         ['list_milestones', { owner: 'bad', repo: 'msstate', state: 'archived' }, '/repos/bad/msstate'],
+        [
+          'create_commit_status',
+          { owner: 'bad', repo: 'status', sha: 'deadbeef', state: 'green', context: 'ci' },
+          '/repos/bad/status',
+        ],
         [
           'create_milestone',
           { owner: 'bad', repo: 'mscreate', title: 'x', state: 'paused' },
@@ -901,6 +932,23 @@ async function checkRequestContract() {
   // issue the caller guessed wrong.
   if (!only('DELETE', '/api/v1/repos/o/r/issues/comments/78')) {
     fail('contract: delete_issue_comment must DELETE the repository-scoped comment path');
+  }
+
+  const status = only('POST', '/api/v1/repos/o/r/statuses/abc123');
+  if (status.body?.state !== 'success' || status.body?.context !== 'smoke/ci') {
+    fail(`contract: create_commit_status must POST state and context, sent ${JSON.stringify(status.body)}`);
+  }
+  if (status.body?.target_url !== 'https://example.invalid/run/1') {
+    fail(`contract: create_commit_status must forward target_url, sent ${JSON.stringify(status.body)}`);
+  }
+  // A ref can be a branch name with a slash in it; it is one path segment here.
+  const statusList = only('GET', '/api/v1/repos/o/r/commits/v1.0%2Frc/statuses');
+  if (query(statusList, 'page') !== '2' || query(statusList, 'limit') !== '6') {
+    fail('contract: list_commit_statuses must forward paging');
+  }
+  const statusPage = payloads.get('list_commit_statuses');
+  if (!Array.isArray(statusPage?.items) || statusPage?.total_count !== 51) {
+    fail(`contract: list_commit_statuses must return the paginated envelope, got ${JSON.stringify(statusPage)}`);
   }
 
   const files = only('GET', '/api/v1/repos/o/r/pulls/21/files');

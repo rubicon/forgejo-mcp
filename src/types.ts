@@ -50,6 +50,19 @@ export interface Milestone {
   due_on: string | null;
 }
 
+/**
+ * One reported status. The rollup Forgejo returns for a ref is `CommitStatus`
+ * below, which carries the combined state and the entries behind it.
+ */
+export interface CommitStatusEntry {
+  id: number;
+  state: string;
+  context: string;
+  description: string;
+  target_url: string;
+  created_at: string;
+}
+
 export interface DeleteCommentResult {
   deleted: boolean;
   id: number;

@@ -19,6 +19,7 @@ import type {
   Paginated,
   PullRequest,
   Release,
+  CommitStatusEntry,
   DeleteCommentResult,
   DeleteMilestoneResult,
   Milestone,
@@ -589,6 +590,41 @@ export class ForgejoClient {
       method: 'POST',
       body,
     });
+  }
+
+  /**
+   * Report a commit status.
+   *
+   * Statuses are keyed by `context`: posting a second status with the same
+   * context supersedes the first rather than adding to it, which is how a check
+   * moves from pending to success.
+   */
+  createCommitStatus(
+    owner: string,
+    repo: string,
+    sha: string,
+    body: { state: string; context: string; description?: string; target_url?: string },
+  ): Promise<CommitStatusEntry> {
+    return this.request(`${this.repoBase(owner, repo)}/statuses/${ForgejoClient.seg(sha)}`, {
+      method: 'POST',
+      body,
+    });
+  }
+
+  /**
+   * List the individual statuses on a ref. `getCommitStatus` reports the rolled
+   * up verdict; this is what says which check produced it.
+   */
+  listCommitStatuses(
+    owner: string,
+    repo: string,
+    ref: string,
+    opts: { page?: number; limit?: number } = {},
+  ): Promise<Paginated<CommitStatusEntry>> {
+    return this.requestPage(
+      `${this.repoBase(owner, repo)}/commits/${ForgejoClient.seg(ref)}/statuses`,
+      { page: opts.page, limit: opts.limit },
+    );
   }
 
   /**

@@ -117,6 +117,9 @@ const ISSUE_TYPES = ['issues', 'pulls', 'all'] as const;
 const ISSUE_STATES = ['open', 'closed'] as const;
 const REVIEW_EVENTS = ['APPROVED', 'REQUEST_CHANGES', 'COMMENT'] as const;
 const MERGE_STYLES = ['merge', 'rebase', 'squash'] as const;
+// Forgejo's CommitStatusState. The swagger documents these in prose rather than
+// as an enum, so the list is transcribed from that description.
+const COMMIT_STATUS_STATES = ['pending', 'success', 'error', 'failure', 'warning'] as const;
 // The two listing endpoints sort by different things; neither list is a subset
 // of the other, so they stay separate rather than being merged into one.
 const ISSUE_SORTS = [
@@ -818,6 +821,63 @@ export const tools: ToolDefinition[] = [
       c.requestPullRequestReviewers(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), {
         reviewers: req(a, 'reviewers'),
         team_reviewers: a.team_reviewers,
+      }),
+  },
+  {
+    name: 'create_commit_status',
+    description:
+      'Report a commit status: the mechanism a CI system uses to mark a commit ' +
+      'pending, success, error, failure or warning. Statuses are keyed by context, ' +
+      'so posting again with the same context supersedes the earlier one rather ' +
+      'than adding to it. If the repository gates merges on a status context, a ' +
+      'status posted here can satisfy or block that gate.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        sha: { type: 'string', description: 'Commit sha the status belongs to' },
+        state: {
+          type: 'string',
+          enum: COMMIT_STATUS_STATES,
+          description: 'Status verdict',
+        },
+        context: {
+          type: 'string',
+          description: 'Check identity, e.g. ci/build. Reposting this context replaces the status',
+        },
+        description: { type: 'string', description: 'Short human-readable summary' },
+        target_url: { type: 'string', description: 'Link to the run or logs behind the status' },
+      },
+      required: ['owner', 'repo', 'sha', 'state', 'context'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    handler: (c, a) =>
+      c.createCommitStatus(req(a, 'owner'), req(a, 'repo'), req(a, 'sha'), {
+        state: oneOf(a, 'state', COMMIT_STATUS_STATES),
+        context: req(a, 'context'),
+        description: a.description,
+        target_url: a.target_url,
+      }),
+  },
+  {
+    name: 'list_commit_statuses',
+    description:
+      'List the individual statuses reported on a ref. get_commit_status gives the ' +
+      'combined verdict; this is what shows which check produced it.' + PAGE_SHAPE,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        ref: { type: 'string', description: 'Branch, tag or commit sha' },
+        ...pagination,
+      },
+      required: ['owner', 'repo', 'ref'],
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    handler: (c, a) =>
+      c.listCommitStatuses(req(a, 'owner'), req(a, 'repo'), req(a, 'ref'), {
+        page: a.page,
+        limit: a.limit,
       }),
   },
   {

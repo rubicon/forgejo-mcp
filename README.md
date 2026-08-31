@@ -61,6 +61,8 @@ to the safe default described above.
 | `list_pull_request_reviews` | read | Reviews on a PR (approvals, change requests, comments); paginated |
 | `create_pull_request_review` | write | Submit a review (`APPROVED`, `REQUEST_CHANGES`, or `COMMENT`), with optional inline comments pinned to a `commit_id` |
 | `request_pull_request_reviewers` | write | Request reviews from users (and org teams) on a PR |
+| `create_commit_status` | write | Report a commit status (pending, success, error, failure, warning) |
+| `list_commit_statuses` | read | Individual statuses on a ref; paginated |
 | `edit_issue_comment` | write | Replace the text of a comment (by comment id) |
 | `delete_issue_comment` | write | Delete a comment (by comment id); not recoverable here |
 | `list_milestones` | read | Milestones in a repository (id, title, state, issue counts); paginated |
