@@ -1081,6 +1081,88 @@ export const tools: ToolDefinition[] = [
     handler: (c, a) => c.deleteMilestone(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
   },
   {
+    name: 'get_label',
+    description: 'Get one label definition by id (name, colour, description).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: 'number', description: 'Label id (see list_labels)' },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    handler: (c, a) => c.getLabel(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
+  },
+  {
+    name: 'create_label',
+    description:
+      'Define a new label in the repository. add_labels can only attach labels that ' +
+      'already exist, so this is what makes a new one available. color is a hex value ' +
+      'such as #ff0000. An exclusive label is one of a mutually exclusive set sharing ' +
+      'a scope/ prefix.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        name: { type: 'string', description: 'Label name' },
+        color: { type: 'string', description: 'Hex colour, e.g. #ff0000' },
+        description: { type: 'string', description: 'What the label means' },
+        exclusive: {
+          type: 'boolean',
+          description: 'Treat as one of a mutually exclusive scope/ set',
+        },
+        is_archived: { type: 'boolean', description: 'Create it archived' },
+      },
+      required: ['owner', 'repo', 'name', 'color'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    handler: (c, a) =>
+      c.createLabel(req(a, 'owner'), req(a, 'repo'), {
+        name: req(a, 'name'),
+        color: req(a, 'color'),
+        description: a.description,
+        exclusive: a.exclusive,
+        is_archived: a.is_archived,
+      }),
+  },
+  {
+    name: 'edit_label',
+    description:
+      'Edit a label definition. Only the fields you pass change. Renaming a label ' +
+      'here renames it everywhere it is used; it does not create a second label. ' +
+      'Use add_labels and remove_label to change which labels an issue carries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: 'number', description: 'Label id (see list_labels)' },
+        name: { type: 'string', description: 'Replacement name; omit to leave it unchanged' },
+        color: { type: 'string', description: 'Replacement hex colour; omit to leave it unchanged' },
+        description: { type: 'string', description: 'Replacement description' },
+        exclusive: { type: 'boolean', description: 'Whether it is one of a scope/ set' },
+        is_archived: { type: 'boolean', description: 'Archive or unarchive the label' },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    handler: (c, a) => {
+      const edit = {
+        name: a.name,
+        color: a.color,
+        description: a.description,
+        exclusive: a.exclusive,
+        is_archived: a.is_archived,
+      };
+      if (Object.values(edit).every((value) => value === undefined)) {
+        throw new Error(
+          'edit_label needs at least one of name, color, description, exclusive or is_archived.',
+        );
+      }
+      return c.editLabel(req(a, 'owner'), req(a, 'repo'), req(a, 'id'), edit);
+    },
+  },
+  {
     name: 'list_labels',
     description:
       'List the labels defined in a repository (id, name, color). Useful for discovering ' +
@@ -1342,6 +1424,25 @@ export const elevatedTools: ToolDefinition[] = [
       }
       return c.deleteRepo(owner, repo);
     },
+  },
+  {
+    name: 'delete_label',
+    description:
+      '[ELEVATED — DESTRUCTIVE] Permanently delete a label definition. This strips the ' +
+      'label from every issue and pull request that carried it, and neither the label ' +
+      'nor those associations can be restored from this server. To take a label off one ' +
+      'issue use remove_label; to retire a label without losing its history, archive it ' +
+      'with edit_label.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: 'number', description: 'Label id to delete (see list_labels)' },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    handler: (c, a) => c.deleteLabel(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
   },
   {
     name: 'delete_branch',

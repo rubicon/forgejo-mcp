@@ -21,6 +21,7 @@ import type {
   Release,
   CommitStatusEntry,
   DeleteCommentResult,
+  DeleteLabelResult,
   DeleteMilestoneResult,
   Milestone,
   RemoveLabelResult,
@@ -731,6 +732,55 @@ export class ForgejoClient {
       `${this.repoBase(owner, repo)}/milestones/${ForgejoClient.seg(String(id))}`,
       { method: 'DELETE' },
     );
+    return { deleted: true, id };
+  }
+
+  getLabel(owner: string, repo: string, id: number): Promise<Label> {
+    return this.request(`${this.repoBase(owner, repo)}/labels/${id}`);
+  }
+
+  createLabel(
+    owner: string,
+    repo: string,
+    body: {
+      name: string;
+      color: string;
+      description?: string;
+      exclusive?: boolean;
+      is_archived?: boolean;
+    },
+  ): Promise<Label> {
+    return this.request(`${this.repoBase(owner, repo)}/labels`, { method: 'POST', body });
+  }
+
+  /** Edit a label definition. Only the named fields are sent. */
+  editLabel(
+    owner: string,
+    repo: string,
+    id: number,
+    edit: {
+      name?: string;
+      color?: string;
+      description?: string;
+      exclusive?: boolean;
+      is_archived?: boolean;
+    },
+  ): Promise<Label> {
+    return this.request(`${this.repoBase(owner, repo)}/labels/${id}`, {
+      method: 'PATCH',
+      body: edit,
+    });
+  }
+
+  /**
+   * Delete a label definition. Elevated: this strips the label from every issue
+   * and pull request that carried it, and neither the label nor those
+   * associations can be restored from here.
+   */
+  async deleteLabel(owner: string, repo: string, id: number): Promise<DeleteLabelResult> {
+    await this.requestElevated(`${this.repoBase(owner, repo)}/labels/${id}`, {
+      method: 'DELETE',
+    });
     return { deleted: true, id };
   }
 

@@ -72,6 +72,9 @@ to the safe default described above.
 | `edit_milestone` | write | Edit a milestone; only the fields you pass change |
 | `delete_milestone` | write | Delete a milestone; issues survive but lose it |
 | `list_labels` | read | Labels defined in a repository (id, name, color); paginated |
+| `get_label` | read | One label definition by id |
+| `create_label` | write | Define a new label (name and colour required) |
+| `edit_label` | write | Edit a label definition; renames it everywhere it is used |
 | `add_labels` | write | Add labels (by name or id) to an issue or PR; existing labels kept |
 | `remove_label` | write | Remove one label (by name or id) from an issue or PR |
 | `add_assignees` | write | Assign users to an issue or PR; existing assignees kept |
@@ -182,7 +185,7 @@ mcp__forgejo
 
 **If you turn on the elevated tier, do _not_ do this** — a blanket allowlist
 would let every elevated tool run without a prompt: `merge_pull_request`,
-`delete_branch`, `create_repo` and `delete_repo`. Allowlist named default tools
+`delete_branch`, `create_repo`, `delete_repo` and `delete_label`. Allowlist named default tools
 only, never an elevated one, and never `delete_repo` under any circumstances —
 its `confirm` argument catches a malformed call, not a misled one. For example:
 
