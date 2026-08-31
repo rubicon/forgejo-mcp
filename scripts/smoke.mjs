@@ -13,9 +13,9 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
-// + get_pull_request_files (#85) + remove_label (#88) = 36 base tools; elevated
-// adds 2 more.
-const BASE_TOOLS = 36;
+// + get_pull_request_files (#85) + remove_label (#88) + edit_issue (#123)
+// = 37 base tools; elevated adds 2 more.
+const BASE_TOOLS = 37;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -41,6 +41,7 @@ const EXPECTED_NAMES = [
   'set_issue_state',
   'get_pull_request_files',
   'remove_label',
+  'edit_issue',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -230,15 +231,15 @@ const READ_ONLY = [
 // only some of them are hard to undo. Severity lives in the description.
 const DESTRUCTIVE = [
   'merge_pull_request', 'delete_branch', 'delete_repo',
-  'update_file', 'remove_label', 'set_issue_state',
+  'update_file', 'remove_label', 'set_issue_state', 'edit_issue',
 ];
-// A repeat with the same arguments has no further effect. Kept to the two where
-// the semantics are "set it to this", which the server can reason about without
-// a live instance. add_assignees reads and PATCHes a whole replacement list, so
-// a repeat can lose a concurrent update; request_pull_request_reviewers POSTs
-// and its remote side effects on a repeat are unverified. Advertising retry
-// safety that has not been demonstrated is worse than omitting the hint.
-const IDEMPOTENT = ['add_labels', 'set_issue_state'];
+// A repeat with the same arguments has no further effect. Kept to the three
+// where the semantics are "set it to this", which the server can reason about
+// without a live instance. add_assignees reads and PATCHes a whole replacement
+// list, so a repeat can lose a concurrent update; request_pull_request_reviewers
+// POSTs and its remote side effects on a repeat are unverified. Advertising
+// retry safety that has not been demonstrated is worse than omitting the hint.
+const IDEMPOTENT = ['add_labels', 'set_issue_state', 'edit_issue'];
 
 function checkAnnotations(tools, { elevated }) {
   for (const tool of tools) {
@@ -316,8 +317,27 @@ function checkToolSchemas(tools) {
   }
   for (const key of ['title', 'body']) {
     if (issueState.properties?.[key]) {
-      fail(`schema: set_issue_state must not expose ${key} — content edits are out of scope`);
+      fail(`schema: set_issue_state must not expose ${key} — edit_issue owns content edits`);
     }
+  }
+
+  // The other half of that split: edit_issue owns title and body, and must not
+  // reach the fields another tool already owns. One writer per field is what
+  // keeps two tools from disagreeing about the same PATCH.
+  const edit = schemaOf(tools, 'edit_issue');
+  for (const key of ['title', 'body']) {
+    if (!edit.properties?.[key]) fail(`schema: edit_issue must expose ${key}`);
+  }
+  for (const key of ['state', 'assignees']) {
+    if (edit.properties?.[key]) {
+      fail(`schema: edit_issue must not expose ${key} — set_issue_state and add_assignees own it`);
+    }
+  }
+  // Partial edit: neither field is required, because sending an unchanged one
+  // back is how a concurrent update gets clobbered.
+  const editRequired = edit.required ?? [];
+  if (editRequired.join(',') !== 'owner,repo,index') {
+    fail(`schema: edit_issue must require only owner, repo and index, got [${editRequired}]`);
   }
 
   // The two endpoints genuinely differ: IssueLabelsOption takes names or ids,
@@ -401,6 +421,8 @@ async function checkRequestContract() {
         // Labels go on the same way they come off: names or ids, the API accepts both.
         ['add_labels', { owner: 'o', repo: 'r', index: 41, labels: ['needs triage/urgent', 7] }],
         ['set_issue_state', { owner: 'o', repo: 'r', index: 12, state: 'closed' }],
+        ['edit_issue', { owner: 'o', repo: 'r', index: 55, title: 'new title', body: 'new body' }],
+        ['edit_issue', { owner: 'o', repo: 'r', index: 56, body: 'only the body' }],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
         if (result?.isError) {
@@ -433,6 +455,21 @@ async function checkRequestContract() {
         }
         if (stub.received.some((entry) => entry.url.includes(marker))) {
           fail(`contract: ${name} must not send an out-of-enum value to the API`);
+        }
+      }
+
+      // An edit that names no field would PATCH an empty body: Forgejo answers
+      // 200 and nothing changes, so the caller is told it succeeded. Refuse it.
+      {
+        const rejected = await rpc.request('tools/call', {
+          name: 'edit_issue',
+          arguments: { owner: 'bad', repo: 'noedit', index: 15 },
+        });
+        if (!rejected?.isError) {
+          fail('contract: edit_issue must reject a call that names neither title nor body');
+        }
+        if (stub.received.some((entry) => entry.url.includes('/repos/bad/noedit'))) {
+          fail('contract: edit_issue must not send an empty edit to the API');
         }
       }
 
@@ -720,6 +757,21 @@ async function checkRequestContract() {
     fail(
       'contract: set_issue_state must send state and nothing else, sent ' +
         Object.keys(issueState.body ?? {}).join(','),
+    );
+  }
+
+  const edited = only('PATCH', '/api/v1/repos/o/r/issues/55');
+  if (edited.body?.title !== 'new title' || edited.body?.body !== 'new body') {
+    fail(`contract: edit_issue must PATCH title and body, sent ${JSON.stringify(edited.body)}`);
+  }
+  // A partial edit must not carry the fields the caller left alone: sending
+  // title: undefined would blank the title on an issue the caller only wanted
+  // to reword.
+  const partial = only('PATCH', '/api/v1/repos/o/r/issues/56');
+  if (Object.keys(partial.body ?? {}).join(',') !== 'body') {
+    fail(
+      'contract: edit_issue must send only the fields provided, sent ' +
+        Object.keys(partial.body ?? {}).join(','),
     );
   }
 

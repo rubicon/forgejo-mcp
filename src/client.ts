@@ -624,8 +624,28 @@ export class ForgejoClient {
   }
 
   /**
-   * Close or reopen an issue. Only `state` is sent: the same endpoint edits the
-   * title and body, and this client deliberately never reaches for those.
+   * Edit an issue's title or body. Pull requests share issue numbering, so this
+   * reaches them too.
+   *
+   * Only the fields the caller named are sent. The endpoint replaces what it
+   * receives, so passing an unchanged value back would overwrite a concurrent
+   * edit instead of leaving it alone.
+   */
+  editIssue(
+    owner: string,
+    repo: string,
+    index: number,
+    edit: { title?: string; body?: string },
+  ): Promise<Issue> {
+    return this.request(`${this.repoBase(owner, repo)}/issues/${index}`, {
+      method: 'PATCH',
+      body: edit,
+    });
+  }
+
+  /**
+   * Close or reopen an issue. Only `state` is sent, so this tool cannot disturb
+   * the title or body that `editIssue` owns on the same endpoint.
    */
   setIssueState(owner: string, repo: string, index: number, state: string): Promise<Issue> {
     return this.request(`${this.repoBase(owner, repo)}/issues/${index}`, {
