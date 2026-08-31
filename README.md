@@ -40,6 +40,7 @@ to the safe default described above.
 | `get_file_content` | read | Decoded file content (default branch if no ref) |
 | `list_directory` | read | List a directory's entries (root if no path); fails on a file path; paginated |
 | `create_file` | write | Create a file from plain-text content (optional new branch) |
+| `delete_file` | write | Delete a file; requires the blob `sha`, commits like any change |
 | `update_file` | write | Replace a file's content (`sha` required — the blob SHA being replaced) |
 | `list_pull_requests` | read | List PRs; filter by state, milestone id, label ids, and poster; sortable; paginated |
 | `get_pull_request` | read | A single PR with merge state |
