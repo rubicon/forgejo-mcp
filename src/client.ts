@@ -350,6 +350,23 @@ export class ForgejoClient {
     });
   }
 
+  /**
+   * Delete a file. `sha` is the blob SHA of the file being removed: the API
+   * requires it, and it is the same freshness guard `updateFile` carries, so a
+   * deletion cannot land on a file that changed since the caller read it.
+   */
+  deleteFile(
+    owner: string,
+    repo: string,
+    filepath: string,
+    body: { sha: string; message?: string; branch?: string },
+  ): Promise<FileChangeResponse> {
+    return this.request(`${this.repoBase(owner, repo)}/contents/${ForgejoClient.filePath(filepath)}`, {
+      method: 'DELETE',
+      body,
+    });
+  }
+
   listPullRequests(
     owner: string,
     repo: string,

@@ -375,7 +375,7 @@ export const tools: ToolDefinition[] = [
       'Update an existing file. content is plain UTF-8 text (base64-encoded for you) and ' +
       'REPLACES the file. sha is the file\'s current blob SHA from get_file_content: the ' +
       'API requires it, and it guards against overwriting concurrent changes. Commits to ' +
-      'branch (default branch if omitted). Additive write; nothing is deleted.',
+      'branch (default branch if omitted). Removing a file is delete_file.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -395,6 +395,36 @@ export const tools: ToolDefinition[] = [
     handler: (c, a) =>
       c.updateFile(req(a, 'owner'), req(a, 'repo'), req(a, 'path'), {
         content: Buffer.from(req<string>(a, 'content'), 'utf-8').toString('base64'),
+        sha: req(a, 'sha'),
+        message: a.message,
+        branch: a.branch,
+      }),
+  },
+  {
+    name: 'delete_file',
+    description:
+      'Delete a file. sha is the file\'s current blob SHA from get_file_content: the API ' +
+      'requires it, and it guards against deleting a file that changed since you read it. ' +
+      'Commits to branch (default branch if omitted). The deletion is an ordinary commit, ' +
+      'so git can revert it; the sha is a freshness check, not evidence the removal was ' +
+      'reviewed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        path: { type: 'string', description: 'File path within the repository' },
+        sha: {
+          type: 'string',
+          description: 'Current blob SHA of the file being deleted (from get_file_content)',
+        },
+        message: { type: 'string', description: 'Commit message' },
+        branch: { type: 'string', description: 'Branch to commit to (defaults to the repo default branch)' },
+      },
+      required: ['owner', 'repo', 'path', 'sha'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    handler: (c, a) =>
+      c.deleteFile(req(a, 'owner'), req(a, 'repo'), req(a, 'path'), {
         sha: req(a, 'sha'),
         message: a.message,
         branch: a.branch,

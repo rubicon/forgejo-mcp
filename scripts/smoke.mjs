@@ -15,8 +15,8 @@ import { fileURLToPath } from 'node:url';
 // 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
 // + get_pull_request_files (#85) + remove_label (#88) + edit_issue (#123)
 // + 5 milestone tools (#124) + 2 comment tools (#125) + 2 commit-status tools
-// (#126) = 46 base tools; elevated adds 2 more.
-const BASE_TOOLS = 46;
+// (#126) + delete_file (#128) = 47 base tools; elevated adds 2 more.
+const BASE_TOOLS = 47;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -52,6 +52,7 @@ const EXPECTED_NAMES = [
   'delete_issue_comment',
   'create_commit_status',
   'list_commit_statuses',
+  'delete_file',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -244,6 +245,7 @@ const DESTRUCTIVE = [
   'merge_pull_request', 'delete_branch', 'delete_repo',
   'update_file', 'remove_label', 'set_issue_state', 'edit_issue',
   'edit_milestone', 'delete_milestone', 'edit_issue_comment', 'delete_issue_comment',
+  'delete_file',
 ];
 // A repeat with the same arguments has no further effect. Kept to the three
 // where the semantics are "set it to this", which the server can reason about
@@ -423,6 +425,17 @@ function checkToolSchemas(tools) {
   if (!(update.required ?? []).includes('sha')) {
     fail('schema: update_file must require sha (the API rejects an update without it)');
   }
+
+  // delete_file carries the same concurrency guard update_file does. Losing it
+  // would make deletion the one content operation that cannot tell whether it
+  // is acting on the file the caller last read.
+  const del = schemaOf(tools, 'delete_file');
+  if (!(del.required ?? []).includes('sha')) {
+    fail('schema: delete_file must require sha (the API rejects a delete without it)');
+  }
+  if (del.properties?.content) {
+    fail('schema: delete_file must not take content — there is nothing to write');
+  }
 }
 
 function checkElevatedSchemas(tools) {
@@ -511,6 +524,13 @@ async function checkRequestContract() {
           },
         ],
         ['list_commit_statuses', { owner: 'o', repo: 'r', ref: 'v1.0/rc', page: 2, limit: 6 }],
+        [
+          'delete_file',
+          {
+            owner: 'o', repo: 'r', path: 'docs/old notes.md', sha: 'blob99',
+            message: 'chore: drop stale notes', branch: 'cleanup',
+          },
+        ],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
         if (result?.isError) {
@@ -554,6 +574,23 @@ async function checkRequestContract() {
         }
         if (stub.received.some((entry) => entry.url.includes(marker))) {
           fail(`contract: ${name} must not send an out-of-enum value to the API`);
+        }
+      }
+
+      // The schema marking sha required is advertising; nothing validates a
+      // tool call before the handler runs. A delete that reaches the API
+      // without one is the case the guard exists to prevent, so assert the
+      // handler refuses it rather than trusting the schema to.
+      {
+        const rejected = await rpc.request('tools/call', {
+          name: 'delete_file',
+          arguments: { owner: 'bad', repo: 'nosha', path: 'a.md' },
+        });
+        if (!rejected?.isError) {
+          fail('contract: delete_file must reject a call with no sha');
+        }
+        if (stub.received.some((entry) => entry.url.includes('/repos/bad/nosha'))) {
+          fail('contract: delete_file must not send a delete without a sha');
         }
       }
 
@@ -949,6 +986,16 @@ async function checkRequestContract() {
   const statusPage = payloads.get('list_commit_statuses');
   if (!Array.isArray(statusPage?.items) || statusPage?.total_count !== 51) {
     fail(`contract: list_commit_statuses must return the paginated envelope, got ${JSON.stringify(statusPage)}`);
+  }
+
+  // The path keeps its separators as separators and encodes the rest, so a
+  // directory is not flattened into one segment and a space does not break it.
+  const deleted = only('DELETE', '/api/v1/repos/o/r/contents/docs/old%20notes.md');
+  if (deleted.body?.sha !== 'blob99' || deleted.body?.branch !== 'cleanup') {
+    fail(`contract: delete_file must send sha and branch, sent ${JSON.stringify(deleted.body)}`);
+  }
+  if (deleted.body?.message !== 'chore: drop stale notes') {
+    fail(`contract: delete_file must forward the commit message, sent ${JSON.stringify(deleted.body)}`);
   }
 
   const files = only('GET', '/api/v1/repos/o/r/pulls/21/files');
