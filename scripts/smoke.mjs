@@ -14,8 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 // 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
 // + get_pull_request_files (#85) + remove_label (#88) + edit_issue (#123)
-// = 37 base tools; elevated adds 2 more.
-const BASE_TOOLS = 37;
+// + 5 milestone tools (#124) = 42 base tools; elevated adds 2 more.
+const BASE_TOOLS = 42;
 const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo'];
 const EXPECTED_NAMES = [
   'create_release',
@@ -42,6 +42,11 @@ const EXPECTED_NAMES = [
   'get_pull_request_files',
   'remove_label',
   'edit_issue',
+  'list_milestones',
+  'get_milestone',
+  'create_milestone',
+  'edit_milestone',
+  'delete_milestone',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -223,7 +228,7 @@ const READ_ONLY = [
   'get_file_content', 'list_directory', 'list_pull_requests', 'get_pull_request',
   'get_pull_request_diff', 'get_pull_request_files', 'get_commit_status', 'list_branches',
   'get_branch', 'list_commits', 'get_commit', 'list_releases', 'get_release', 'list_tags',
-  'get_tag', 'list_pull_request_reviews', 'list_labels',
+  'get_tag', 'list_pull_request_reviews', 'list_labels', 'list_milestones', 'get_milestone',
 ];
 // Not additive. The MCP definition of destructiveHint is "performs only additive
 // updates" when false, which is narrower than "irreversible": replacing a file,
@@ -232,6 +237,7 @@ const READ_ONLY = [
 const DESTRUCTIVE = [
   'merge_pull_request', 'delete_branch', 'delete_repo',
   'update_file', 'remove_label', 'set_issue_state', 'edit_issue',
+  'edit_milestone', 'delete_milestone',
 ];
 // A repeat with the same arguments has no further effect. Kept to the three
 // where the semantics are "set it to this", which the server can reason about
@@ -239,7 +245,7 @@ const DESTRUCTIVE = [
 // list, so a repeat can lose a concurrent update; request_pull_request_reviewers
 // POSTs and its remote side effects on a repeat are unverified. Advertising
 // retry safety that has not been demonstrated is worse than omitting the hint.
-const IDEMPOTENT = ['add_labels', 'set_issue_state', 'edit_issue'];
+const IDEMPOTENT = ['add_labels', 'set_issue_state', 'edit_issue', 'edit_milestone'];
 
 function checkAnnotations(tools, { elevated }) {
   for (const tool of tools) {
@@ -352,6 +358,30 @@ function checkToolSchemas(tools) {
     fail(`schema: create_issue.labels must stay ids-only, got ${JSON.stringify(createItems.type)}`);
   }
 
+  // Milestones are referenced by id everywhere else in the surface, but the
+  // endpoint falls back to matching a name, which is the only way to reach one
+  // whose id the caller never learned. Advertise both or the fallback is
+  // invisible.
+  const milestoneId = schemaOf(tools, 'get_milestone').properties?.id ?? {};
+  if (!Array.isArray(milestoneId.type) || !milestoneId.type.includes('string')) {
+    fail(`schema: get_milestone.id must accept an id or a name, got ${JSON.stringify(milestoneId.type)}`);
+  }
+  const msList = schemaOf(tools, 'list_milestones');
+  for (const key of ['page', 'limit', 'state']) {
+    if (!msList.properties?.[key]) fail(`schema: list_milestones must expose ${key}`);
+  }
+  const msStates = (msList.properties?.state?.enum ?? []).slice().sort();
+  if (msStates.join(',') !== 'all,closed,open') {
+    fail(`schema: list_milestones state enum must be open|closed|all, got [${msList.properties?.state?.enum}]`);
+  }
+  if (!(schemaOf(tools, 'create_milestone').required ?? []).includes('title')) {
+    fail('schema: create_milestone must require title');
+  }
+  const msEdit = schemaOf(tools, 'edit_milestone').required ?? [];
+  if (msEdit.join(',') !== 'owner,repo,id') {
+    fail(`schema: edit_milestone must require only owner, repo and id, got [${msEdit}]`);
+  }
+
   const update = schemaOf(tools, 'update_file');
   if (!(update.required ?? []).includes('sha')) {
     fail('schema: update_file must require sha (the API rejects an update without it)');
@@ -423,6 +453,17 @@ async function checkRequestContract() {
         ['set_issue_state', { owner: 'o', repo: 'r', index: 12, state: 'closed' }],
         ['edit_issue', { owner: 'o', repo: 'r', index: 55, title: 'new title', body: 'new body' }],
         ['edit_issue', { owner: 'o', repo: 'r', index: 56, body: 'only the body' }],
+        [
+          'list_milestones',
+          { owner: 'f', repo: 'ms', state: 'all', name: 'v1', page: 2, limit: 5 },
+        ],
+        ['get_milestone', { owner: 'o', repo: 'r', id: 'v1.0 / beta' }],
+        [
+          'create_milestone',
+          { owner: 'o', repo: 'r', title: 'v2', description: 'next', state: 'open' },
+        ],
+        ['edit_milestone', { owner: 'o', repo: 'r', id: 9, description: 'only this' }],
+        ['delete_milestone', { owner: 'o', repo: 'r', id: 8 }],
       ]) {
         const result = await rpc.request('tools/call', { name, arguments: args });
         if (result?.isError) {
@@ -436,6 +477,12 @@ async function checkRequestContract() {
       // the handler and must never reach the API. One case per enum field.
       for (const [name, args, marker] of [
         ['set_issue_state', { owner: 'o', repo: 'r', index: 13, state: 'deleted' }, '/issues/13'],
+        ['list_milestones', { owner: 'bad', repo: 'msstate', state: 'archived' }, '/repos/bad/msstate'],
+        [
+          'create_milestone',
+          { owner: 'bad', repo: 'mscreate', title: 'x', state: 'paused' },
+          '/repos/bad/mscreate',
+        ],
         ['list_issues', { owner: 'bad', repo: 'enum', type: 'everything' }, '/repos/bad/enum'],
         ['list_issues', { owner: 'bad', repo: 'state', state: 'archived' }, '/repos/bad/state'],
         ['list_pull_requests', { owner: 'bad', repo: 'prstate', state: 'draft' }, '/repos/bad/prstate'],
@@ -455,6 +502,20 @@ async function checkRequestContract() {
         }
         if (stub.received.some((entry) => entry.url.includes(marker))) {
           fail(`contract: ${name} must not send an out-of-enum value to the API`);
+        }
+      }
+
+      // Same empty-edit trap as edit_issue, same answer.
+      {
+        const rejected = await rpc.request('tools/call', {
+          name: 'edit_milestone',
+          arguments: { owner: 'bad', repo: 'msedit', id: 3 },
+        });
+        if (!rejected?.isError) {
+          fail('contract: edit_milestone must reject a call that names no field to change');
+        }
+        if (stub.received.some((entry) => entry.url.includes('/repos/bad/msedit'))) {
+          fail('contract: edit_milestone must not send an empty edit to the API');
         }
       }
 
@@ -773,6 +834,35 @@ async function checkRequestContract() {
       'contract: edit_issue must send only the fields provided, sent ' +
         Object.keys(partial.body ?? {}).join(','),
     );
+  }
+
+  const msFiltered = only('GET', '/api/v1/repos/f/ms/milestones');
+  for (const [key, want] of [['state', 'all'], ['name', 'v1'], ['page', '2'], ['limit', '5']]) {
+    if (query(msFiltered, key) !== want) {
+      fail(`contract: list_milestones must forward ${key}=${want}, sent ${query(msFiltered, key)}`);
+    }
+  }
+  const msPage = payloads.get('list_milestones');
+  if (!Array.isArray(msPage?.items) || msPage?.total_count !== 51) {
+    fail(`contract: list_milestones must return the paginated envelope, got ${JSON.stringify(msPage)}`);
+  }
+  // A name carries spaces and a slash; both have to survive as one path segment.
+  if (!only('GET', '/api/v1/repos/o/r/milestones/v1.0%20%2F%20beta')) {
+    fail('contract: get_milestone must encode a name into a single path segment');
+  }
+  const msCreated = only('POST', '/api/v1/repos/o/r/milestones');
+  if (msCreated.body?.title !== 'v2' || msCreated.body?.description !== 'next') {
+    fail(`contract: create_milestone must POST its fields, sent ${JSON.stringify(msCreated.body)}`);
+  }
+  const msEdited = only('PATCH', '/api/v1/repos/o/r/milestones/9');
+  if (Object.keys(msEdited.body ?? {}).join(',') !== 'description') {
+    fail(
+      'contract: edit_milestone must send only the fields provided, sent ' +
+        Object.keys(msEdited.body ?? {}).join(','),
+    );
+  }
+  if (!only('DELETE', '/api/v1/repos/o/r/milestones/8')) {
+    fail('contract: delete_milestone must DELETE the milestone path');
   }
 
   const files = only('GET', '/api/v1/repos/o/r/pulls/21/files');

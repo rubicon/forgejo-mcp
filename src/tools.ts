@@ -821,6 +821,139 @@ export const tools: ToolDefinition[] = [
       }),
   },
   {
+    name: 'list_milestones',
+    description:
+      'List the milestones defined in a repository (id, title, state, open and closed ' +
+      'issue counts). This is how you find the id that list_issues, create_issue and ' +
+      'create_pull_request all expect.' + PAGE_SHAPE,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        state: {
+          type: 'string',
+          enum: FILTER_STATES,
+          description: 'Filter by milestone state (default: open)',
+        },
+        name: { type: 'string', description: 'Filter by milestone name' },
+        ...pagination,
+      },
+      required: ['owner', 'repo'],
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    handler: (c, a) =>
+      c.listMilestones(req(a, 'owner'), req(a, 'repo'), {
+        state: maybeOneOf(a, 'state', FILTER_STATES),
+        name: a.name,
+        page: a.page,
+        limit: a.limit,
+      }),
+  },
+  {
+    name: 'get_milestone',
+    description:
+      'Get one milestone by id, or by its exact title if you do not have the id ' +
+      '(Forgejo tries the id first, then the title).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: {
+          type: ['number', 'string'],
+          description: 'Milestone id, or its exact title',
+        },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    handler: (c, a) => c.getMilestone(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
+  },
+  {
+    name: 'create_milestone',
+    description:
+      'Create a milestone. due_on is an RFC 3339 timestamp. The new milestone can be ' +
+      'attached to issues with create_issue or edit_issue.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        title: { type: 'string', description: 'Milestone title' },
+        description: { type: 'string', description: 'Milestone description' },
+        due_on: { type: 'string', description: 'Due date, RFC 3339 (e.g. 2026-12-31T23:59:59Z)' },
+        state: {
+          type: 'string',
+          enum: ISSUE_STATES,
+          description: 'State to create it in (default: open)',
+        },
+      },
+      required: ['owner', 'repo', 'title'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    handler: (c, a) =>
+      c.createMilestone(req(a, 'owner'), req(a, 'repo'), {
+        title: req(a, 'title'),
+        description: a.description,
+        due_on: a.due_on,
+        state: maybeOneOf(a, 'state', ISSUE_STATES),
+      }),
+  },
+  {
+    name: 'edit_milestone',
+    description:
+      'Edit a milestone. Only the fields you pass change; omit one to leave it alone. ' +
+      'Closing a milestone here does not close the issues on it. As with edit_issue, ' +
+      'the new value replaces the old and there is no guard against a simultaneous edit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: ['number', 'string'], description: 'Milestone id, or its exact title' },
+        title: { type: 'string', description: 'Replacement title; omit to leave it unchanged' },
+        description: {
+          type: 'string',
+          description: 'Replacement description; omit to leave it unchanged',
+        },
+        due_on: { type: 'string', description: 'Replacement due date, RFC 3339' },
+        state: { type: 'string', enum: ISSUE_STATES, description: 'State to set' },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    handler: (c, a) => {
+      const edit = {
+        title: a.title,
+        description: a.description,
+        due_on: a.due_on,
+        state: maybeOneOf(a, 'state', ISSUE_STATES),
+      };
+      // An edit naming no field PATCHes an empty body, which Forgejo answers 200
+      // while changing nothing: the caller is told an edit happened.
+      if (Object.values(edit).every((value) => value === undefined)) {
+        throw new Error(
+          'edit_milestone needs at least one of title, description, due_on or state.',
+        );
+      }
+      return c.editMilestone(req(a, 'owner'), req(a, 'repo'), req(a, 'id'), edit);
+    },
+  },
+  {
+    name: 'delete_milestone',
+    description:
+      'Delete a milestone. The issues on it are not deleted, but they lose the ' +
+      'milestone, and this server cannot restore either the milestone or those ' +
+      'associations. Closing it with edit_milestone is usually what you want instead.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: ['number', 'string'], description: 'Milestone id, or its exact title' },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    handler: (c, a) => c.deleteMilestone(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
+  },
+  {
     name: 'list_labels',
     description:
       'List the labels defined in a repository (id, name, color). Useful for discovering ' +

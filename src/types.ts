@@ -40,6 +40,21 @@ export interface DeleteRepoResult {
 }
 
 /** Outcome of removing a label; the endpoint answers 204 with no body. */
+export interface Milestone {
+  id: number;
+  title: string;
+  description: string;
+  state: string;
+  open_issues: number;
+  closed_issues: number;
+  due_on: string | null;
+}
+
+export interface DeleteMilestoneResult {
+  deleted: boolean;
+  id: string | number;
+}
+
 export interface RemoveLabelResult {
   removed: boolean;
   index: number;
