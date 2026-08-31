@@ -821,6 +821,43 @@ export const tools: ToolDefinition[] = [
       }),
   },
   {
+    name: 'edit_issue_comment',
+    description:
+      'Replace the text of a comment on an issue or pull request. Takes the comment ' +
+      'id from list_issue_comments, not the issue number. The new text replaces the ' +
+      'old outright and there is no guard against a simultaneous edit by someone ' +
+      'else, so a comment edited from two places keeps only the last write.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: 'number', description: 'Comment id (see list_issue_comments)' },
+        body: { type: 'string', description: 'Replacement comment text in Markdown' },
+      },
+      required: ['owner', 'repo', 'id', 'body'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    handler: (c, a) =>
+      c.editIssueComment(req(a, 'owner'), req(a, 'repo'), req(a, 'id'), req(a, 'body')),
+  },
+  {
+    name: 'delete_issue_comment',
+    description:
+      'Delete a comment on an issue or pull request. The text is gone and this server ' +
+      'cannot restore it; editing the comment with edit_issue_comment keeps the thread ' +
+      'readable where a deletion would leave a gap in the conversation.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        id: { type: 'number', description: 'Comment id (see list_issue_comments)' },
+      },
+      required: ['owner', 'repo', 'id'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+    handler: (c, a) => c.deleteIssueComment(req(a, 'owner'), req(a, 'repo'), req(a, 'id')),
+  },
+  {
     name: 'list_milestones',
     description:
       'List the milestones defined in a repository (id, title, state, open and closed ' +

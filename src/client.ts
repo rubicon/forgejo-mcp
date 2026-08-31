@@ -19,6 +19,7 @@ import type {
   Paginated,
   PullRequest,
   Release,
+  DeleteCommentResult,
   DeleteMilestoneResult,
   Milestone,
   RemoveLabelResult,
@@ -588,6 +589,36 @@ export class ForgejoClient {
       method: 'POST',
       body,
     });
+  }
+
+  /**
+   * Edit a comment on an issue or pull request.
+   *
+   * Comment ids are unique within the repository, so this endpoint is reached
+   * without the issue number. `body` is the whole replacement text: the endpoint
+   * carries no guard against a simultaneous edit, so what it receives wins.
+   */
+  editIssueComment(
+    owner: string,
+    repo: string,
+    id: number,
+    body: string,
+  ): Promise<Comment> {
+    return this.request(`${this.repoBase(owner, repo)}/issues/comments/${id}`, {
+      method: 'PATCH',
+      body: { body },
+    });
+  }
+
+  async deleteIssueComment(
+    owner: string,
+    repo: string,
+    id: number,
+  ): Promise<DeleteCommentResult> {
+    await this.request(`${this.repoBase(owner, repo)}/issues/comments/${id}`, {
+      method: 'DELETE',
+    });
+    return { deleted: true, id };
   }
 
   listMilestones(
