@@ -65,7 +65,8 @@ to the safe default described above.
 | `add_labels` | write | Add labels (by name or id) to an issue or PR; existing labels kept |
 | `remove_label` | write | Remove one label (by name or id) from an issue or PR |
 | `add_assignees` | write | Assign users to an issue or PR; existing assignees kept |
-| `set_issue_state` | write | Close or reopen an issue or PR (state only — no title/body edits) |
+| `set_issue_state` | write | Close or reopen an issue or PR (state only — `edit_issue` owns title/body) |
+| `edit_issue` | write | Edit the title or body of an issue or PR; only the fields you pass change |
 
 ### List results are paginated
 

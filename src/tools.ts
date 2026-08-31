@@ -864,7 +864,7 @@ export const tools: ToolDefinition[] = [
     description:
       'Close or reopen an issue or pull request (they share numbering). Reversible: ' +
       'the state flips back and the timeline records both events. Title and body are ' +
-      'deliberately not editable here.',
+      'not editable here; edit_issue owns those.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -886,6 +886,39 @@ export const tools: ToolDefinition[] = [
         req(a, 'index'),
         oneOf(a, 'state', ISSUE_STATES),
       ),
+  },
+  {
+    name: 'edit_issue',
+    description:
+      'Edit the title or body of an issue or pull request (they share numbering). ' +
+      'Only the fields you pass change; omit one to leave it alone. The new text ' +
+      'replaces the old, and this endpoint takes no sha, so unlike update_file there ' +
+      'is nothing to detect a simultaneous edit by someone else — theirs is ' +
+      'overwritten without warning. Use set_issue_state to open or close one, and ' +
+      'add_assignees to assign.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Issue or pull request number' },
+        title: { type: 'string', description: 'Replacement title; omit to leave it unchanged' },
+        body: {
+          type: 'string',
+          description: 'Replacement body in Markdown; omit to leave it unchanged',
+        },
+      },
+      required: ['owner', 'repo', 'index'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    handler: (c, a) => {
+      const edit = { title: a.title, body: a.body };
+      // An edit naming neither field PATCHes an empty body: Forgejo answers 200
+      // and changes nothing, which reads to the caller as a successful edit.
+      if (edit.title === undefined && edit.body === undefined) {
+        throw new Error('edit_issue needs title, body, or both; an edit naming neither changes nothing.');
+      }
+      return c.editIssue(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), edit);
+    },
   },
   {
     name: 'remove_label',
