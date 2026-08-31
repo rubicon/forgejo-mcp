@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0](https://github.com/rubicon/forgejo-mcp/compare/v0.14.0...v0.15.0) (2026-08-31)
+
+
+### Added
+
+* **tools:** add create_commit_status and list_commit_statuses ([#134](https://github.com/rubicon/forgejo-mcp/issues/134)) ([3a0479b](https://github.com/rubicon/forgejo-mcp/commit/3a0479bb3f60991b79bd9d3923cc63abee5a5967)), closes [#126](https://github.com/rubicon/forgejo-mcp/issues/126)
+* **tools:** add delete_file ([#135](https://github.com/rubicon/forgejo-mcp/issues/135)) ([8054511](https://github.com/rubicon/forgejo-mcp/commit/8054511ed4da235d4ce8fea69250a5532ca3958b)), closes [#128](https://github.com/rubicon/forgejo-mcp/issues/128)
+* **tools:** add edit_issue for issue and pull request content edits ([#131](https://github.com/rubicon/forgejo-mcp/issues/131)) ([be49344](https://github.com/rubicon/forgejo-mcp/commit/be4934442af5c9988ab765f06bac7391e207768f)), closes [#123](https://github.com/rubicon/forgejo-mcp/issues/123)
+* **tools:** add edit_issue_comment and delete_issue_comment ([#133](https://github.com/rubicon/forgejo-mcp/issues/133)) ([9110b7c](https://github.com/rubicon/forgejo-mcp/commit/9110b7c96134186eac37985d60f8807fa9f21c86)), closes [#125](https://github.com/rubicon/forgejo-mcp/issues/125)
+* **tools:** add label definition tools, delete_label elevated ([#136](https://github.com/rubicon/forgejo-mcp/issues/136)) ([5429673](https://github.com/rubicon/forgejo-mcp/commit/5429673328079c299e3df03a2eda473580af24dd)), closes [#127](https://github.com/rubicon/forgejo-mcp/issues/127)
+* **tools:** add milestone tools ([#132](https://github.com/rubicon/forgejo-mcp/issues/132)) ([d6223e3](https://github.com/rubicon/forgejo-mcp/commit/d6223e31a56dce3638dd959489b47e5c6a40356a)), closes [#124](https://github.com/rubicon/forgejo-mcp/issues/124)
+* **tools:** add release reads, edit_release, and elevated release and tag deletion ([#137](https://github.com/rubicon/forgejo-mcp/issues/137)) ([631543c](https://github.com/rubicon/forgejo-mcp/commit/631543ceb5fecb737a4dad10145d5534f9e2b945)), closes [#129](https://github.com/rubicon/forgejo-mcp/issues/129)
+* **tools:** let merge_pull_request request head-branch deletion ([#121](https://github.com/rubicon/forgejo-mcp/issues/121)) ([3b8d856](https://github.com/rubicon/forgejo-mcp/commit/3b8d856686671c0c5ce070b79e82f41459297bd2)), closes [#120](https://github.com/rubicon/forgejo-mcp/issues/120)
+
 ## [0.14.0](https://github.com/rubicon/forgejo-mcp/compare/v0.13.0...v0.14.0) (2026-08-23)
 
 
