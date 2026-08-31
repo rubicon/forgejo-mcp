@@ -24,7 +24,7 @@ delete branch.**
 ```bash
 npm install
 npm run build      # esbuild -> dist/index.js (single bundled file)
-npm run smoke      # build + handshake; asserts BASE_TOOLS in scripts/smoke.mjs (currently 47) + version == package.json
+npm run smoke      # build + handshake; asserts BASE_TOOLS in scripts/smoke.mjs (currently 50) + version == package.json
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -36,7 +36,7 @@ in `src/index.ts`. Do not hardcode a version literal.
 
 See `ARCHITECTURE.md`. In brief: `src/index.ts` wires MCP over stdio;
 `src/client.ts` is the typed Forgejo REST client; `src/tools.ts` holds the tool
-definitions and handlers (47 base `tools` + 4 opt-in `elevatedTools`);
+definitions and handlers (50 base `tools` + 5 opt-in `elevatedTools`);
 `src/types.ts` has the API response shapes.
 esbuild bundles everything to a single `dist/index.js`. `scripts/smoke.mjs` is
 the only check.
@@ -51,8 +51,10 @@ the only check.
   - **Elevated tier** — operations whose damage cannot be undone from this
     server: `merge_pull_request` (integrates code into a branch others build on),
     `delete_branch` (may lose unmerged commits), `create_repo` (chooses its own
-    visibility, so a public one is somewhere to copy private content to), and
-    `delete_repo` (no undo by any means).
+    visibility, so a public one is somewhere to copy private content to),
+    `delete_repo` (no undo by any means), and `delete_label` (strips the label
+    from every issue and pull request that carried it, and neither the label nor
+    those associations can be restored).
 
     Note what this boundary is *not*: "writes to the default branch" would pull
     in `create_file` and `update_file`, which target the default branch when no

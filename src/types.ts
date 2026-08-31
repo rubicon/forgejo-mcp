@@ -110,6 +110,11 @@ export interface Label {
   color: string;
 }
 
+export interface DeleteLabelResult {
+  deleted: boolean;
+  id: number;
+}
+
 export interface Issue {
   id: number;
   number: number;

@@ -15,9 +15,12 @@ import { fileURLToPath } from 'node:url';
 // 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
 // + get_pull_request_files (#85) + remove_label (#88) + edit_issue (#123)
 // + 5 milestone tools (#124) + 2 comment tools (#125) + 2 commit-status tools
-// (#126) + delete_file (#128) = 47 base tools; elevated adds 2 more.
-const BASE_TOOLS = 47;
-const ELEVATED_TOOLS = ['merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo'];
+// (#126) + delete_file (#128) + 3 label tools (#127) = 50 base tools; the
+// elevated tier adds 5, delete_label among them.
+const BASE_TOOLS = 50;
+const ELEVATED_TOOLS = [
+  'merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo', 'delete_label',
+];
 const EXPECTED_NAMES = [
   'create_release',
   'list_releases',
@@ -53,6 +56,9 @@ const EXPECTED_NAMES = [
   'create_commit_status',
   'list_commit_statuses',
   'delete_file',
+  'create_label',
+  'edit_label',
+  'get_label',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -182,7 +188,14 @@ function startStubForgejo() {
     req.on('data', (chunk) => chunks.push(chunk));
     req.on('end', () => {
       const raw = Buffer.concat(chunks).toString('utf8');
-      received.push({ method: req.method, url: req.url, body: raw ? JSON.parse(raw) : undefined });
+      received.push({
+        method: req.method,
+        url: req.url,
+        body: raw ? JSON.parse(raw) : undefined,
+        // The elevated tier is a trust boundary, not a naming convention: which
+        // token a request carries is the only evidence it was honoured.
+        auth: req.headers.authorization,
+      });
       // Reads answer with a short page out of a larger set, so the pagination
       // metadata the list tools report has something to report.
       if (req.method === 'GET') {
@@ -235,17 +248,17 @@ const READ_ONLY = [
   'get_pull_request_diff', 'get_pull_request_files', 'get_commit_status', 'list_branches',
   'get_branch', 'list_commits', 'get_commit', 'list_releases', 'get_release', 'list_tags',
   'get_tag', 'list_pull_request_reviews', 'list_labels', 'list_milestones', 'get_milestone',
-  'list_commit_statuses',
+  'list_commit_statuses', 'get_label',
 ];
 // Not additive. The MCP definition of destructiveHint is "performs only additive
 // updates" when false, which is narrower than "irreversible": replacing a file,
 // removing a label and closing an issue all take something away, even though
 // only some of them are hard to undo. Severity lives in the description.
 const DESTRUCTIVE = [
-  'merge_pull_request', 'delete_branch', 'delete_repo',
+  'merge_pull_request', 'delete_branch', 'delete_repo', 'delete_label',
   'update_file', 'remove_label', 'set_issue_state', 'edit_issue',
   'edit_milestone', 'delete_milestone', 'edit_issue_comment', 'delete_issue_comment',
-  'delete_file',
+  'delete_file', 'edit_label',
 ];
 // A repeat with the same arguments has no further effect. Kept to the three
 // where the semantics are "set it to this", which the server can reason about
@@ -255,6 +268,7 @@ const DESTRUCTIVE = [
 // retry safety that has not been demonstrated is worse than omitting the hint.
 const IDEMPOTENT = [
   'add_labels', 'set_issue_state', 'edit_issue', 'edit_milestone', 'edit_issue_comment',
+  'edit_label',
 ];
 
 function checkAnnotations(tools, { elevated }) {
@@ -429,6 +443,22 @@ function checkToolSchemas(tools) {
   // delete_file carries the same concurrency guard update_file does. Losing it
   // would make deletion the one content operation that cannot tell whether it
   // is acting on the file the caller last read.
+  // CreateLabelOption requires both. A label with no colour is refused by the
+  // API, and learning that from a failed call is worse than a schema that says so.
+  const labelCreate = schemaOf(tools, 'create_label');
+  for (const key of ['name', 'color']) {
+    if (!(labelCreate.required ?? []).includes(key)) {
+      fail(`schema: create_label must require ${key}, got [${labelCreate.required}]`);
+    }
+  }
+  // The label tools key on the id. remove_label takes a name because it edits an
+  // issue's label list; these edit the definition, where the name is the thing
+  // being changed and so cannot also be the identifier.
+  const labelEdit = schemaOf(tools, 'edit_label');
+  if ((labelEdit.required ?? []).join(',') !== 'owner,repo,id') {
+    fail(`schema: edit_label must require only owner, repo and id, got [${labelEdit.required}]`);
+  }
+
   const del = schemaOf(tools, 'delete_file');
   if (!(del.required ?? []).includes('sha')) {
     fail('schema: delete_file must require sha (the API rejects a delete without it)');
@@ -525,6 +555,12 @@ async function checkRequestContract() {
         ],
         ['list_commit_statuses', { owner: 'o', repo: 'r', ref: 'v1.0/rc', page: 2, limit: 6 }],
         [
+          'create_label',
+          { owner: 'o', repo: 'r', name: 'needs triage', color: '#ff0000', description: 'triage me' },
+        ],
+        ['edit_label', { owner: 'o', repo: 'r', id: 12, color: '#00ff00' }],
+        ['get_label', { owner: 'o', repo: 'r', id: 13 }],
+        [
           'delete_file',
           {
             owner: 'o', repo: 'r', path: 'docs/old notes.md', sha: 'blob99',
@@ -591,6 +627,20 @@ async function checkRequestContract() {
         }
         if (stub.received.some((entry) => entry.url.includes('/repos/bad/nosha'))) {
           fail('contract: delete_file must not send a delete without a sha');
+        }
+      }
+
+      // Same empty-edit trap as edit_issue, same answer.
+      {
+        const rejected = await rpc.request('tools/call', {
+          name: 'edit_label',
+          arguments: { owner: 'bad', repo: 'lbledit', id: 4 },
+        });
+        if (!rejected?.isError) {
+          fail('contract: edit_label must reject a call that names no field to change');
+        }
+        if (stub.received.some((entry) => entry.url.includes('/repos/bad/lbledit'))) {
+          fail('contract: edit_label must not send an empty edit to the API');
         }
       }
 
@@ -742,6 +792,49 @@ async function checkRequestContract() {
       }
       if (JSON.parse(deleted.content[0].text)?.branch !== 'dev/88-remove-label') {
         fail('contract: delete_branch must report the branch it deleted');
+      }
+
+      // delete_label is elevated: it must travel on the elevated token like the
+      // rest of the tier, not the everyday one.
+      const labelGone = await elevated.request('tools/call', {
+        name: 'delete_label',
+        arguments: { owner: 'o', repo: 'r', id: 14 },
+      });
+      if (labelGone?.isError) {
+        fail(`contract: delete_label returned an error: ${labelGone.content?.[0]?.text ?? '(no text)'}`);
+      }
+      const labelDeleted = stub.received.filter(
+        (e) => e.method === 'DELETE' && e.url === '/api/v1/repos/o/r/labels/14',
+      );
+      if (labelDeleted.length !== 1) {
+        fail('contract: delete_label must DELETE the label definition path');
+      }
+
+      // #112 fixed an elevated tool running under the everyday token. Nothing
+      // asserted the fix: the stub did not record which token arrived, so
+      // swapping requestElevated for request anywhere in the tier passed. Assert
+      // the boundary in both directions instead of trusting the method name.
+      const elevatedCalls = [
+        ['DELETE', '/api/v1/repos/o/r/labels/14'],
+        ['DELETE', '/api/v1/repos/o/r/branches/dev%2F88-remove-label'],
+        ['POST', '/api/v1/repos/o/r/pulls/9/merge'],
+      ];
+      for (const [method, url] of elevatedCalls) {
+        const sent = stub.received.filter((e) => e.method === method && e.url === url).pop();
+        if (!sent) fail(`contract: expected an elevated ${method} ${url}`);
+        if (sent.auth !== 'token smoke-stub-elevated-token') {
+          fail(
+            `contract: ${method} ${url} is elevated and must carry the elevated token, ` +
+              `carried ${sent.auth}`,
+          );
+        }
+      }
+      // And the everyday surface must not be reaching for the elevated one.
+      const ordinary = stub.received.filter(
+        (e) => e.method === 'PATCH' && e.url === '/api/v1/repos/o/r/labels/12',
+      ).pop();
+      if (ordinary?.auth !== 'token smoke-stub-token') {
+        fail(`contract: edit_label is a default tool and must carry the everyday token, carried ${ordinary?.auth}`);
       }
 
       // A repository is the one thing an agent can create whose visibility it also
@@ -996,6 +1089,21 @@ async function checkRequestContract() {
   }
   if (deleted.body?.message !== 'chore: drop stale notes') {
     fail(`contract: delete_file must forward the commit message, sent ${JSON.stringify(deleted.body)}`);
+  }
+
+  const labelCreated = only('POST', '/api/v1/repos/o/r/labels');
+  if (labelCreated.body?.name !== 'needs triage' || labelCreated.body?.color !== '#ff0000') {
+    fail(`contract: create_label must POST name and color, sent ${JSON.stringify(labelCreated.body)}`);
+  }
+  const labelEdited = only('PATCH', '/api/v1/repos/o/r/labels/12');
+  if (Object.keys(labelEdited.body ?? {}).join(',') !== 'color') {
+    fail(
+      'contract: edit_label must send only the fields provided, sent ' +
+        Object.keys(labelEdited.body ?? {}).join(','),
+    );
+  }
+  if (!only('GET', '/api/v1/repos/o/r/labels/13')) {
+    fail('contract: get_label must GET the label by id');
   }
 
   const files = only('GET', '/api/v1/repos/o/r/pulls/21/files');
