@@ -61,6 +61,11 @@ to the safe default described above.
 | `list_pull_request_reviews` | read | Reviews on a PR (approvals, change requests, comments); paginated |
 | `create_pull_request_review` | write | Submit a review (`APPROVED`, `REQUEST_CHANGES`, or `COMMENT`), with optional inline comments pinned to a `commit_id` |
 | `request_pull_request_reviewers` | write | Request reviews from users (and org teams) on a PR |
+| `list_milestones` | read | Milestones in a repository (id, title, state, issue counts); paginated |
+| `get_milestone` | read | One milestone by id, or by exact title |
+| `create_milestone` | write | Create a milestone (title, description, due date, state) |
+| `edit_milestone` | write | Edit a milestone; only the fields you pass change |
+| `delete_milestone` | write | Delete a milestone; issues survive but lose it |
 | `list_labels` | read | Labels defined in a repository (id, name, color); paginated |
 | `add_labels` | write | Add labels (by name or id) to an issue or PR; existing labels kept |
 | `remove_label` | write | Remove one label (by name or id) from an issue or PR |

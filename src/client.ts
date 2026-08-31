@@ -19,6 +19,8 @@ import type {
   Paginated,
   PullRequest,
   Release,
+  DeleteMilestoneResult,
+  Milestone,
   RemoveLabelResult,
   Repository,
   Review,
@@ -586,6 +588,66 @@ export class ForgejoClient {
       method: 'POST',
       body,
     });
+  }
+
+  listMilestones(
+    owner: string,
+    repo: string,
+    opts: { state?: string; name?: string; page?: number; limit?: number } = {},
+  ): Promise<Paginated<Milestone>> {
+    return this.requestPage(`${this.repoBase(owner, repo)}/milestones`, {
+      state: opts.state,
+      name: opts.name,
+      page: opts.page,
+      limit: opts.limit,
+    });
+  }
+
+  /**
+   * Fetch one milestone. Forgejo matches `id` against the milestone id first and
+   * falls back to its title, which is the only way to reach a milestone whose id
+   * the caller never learned.
+   */
+  getMilestone(owner: string, repo: string, id: string | number): Promise<Milestone> {
+    return this.request(
+      `${this.repoBase(owner, repo)}/milestones/${ForgejoClient.seg(String(id))}`,
+    );
+  }
+
+  createMilestone(
+    owner: string,
+    repo: string,
+    body: { title: string; description?: string; due_on?: string; state?: string },
+  ): Promise<Milestone> {
+    return this.request(`${this.repoBase(owner, repo)}/milestones`, { method: 'POST', body });
+  }
+
+  /**
+   * Edit a milestone. As with `editIssue`, only the named fields are sent: the
+   * endpoint replaces what it receives.
+   */
+  editMilestone(
+    owner: string,
+    repo: string,
+    id: string | number,
+    edit: { title?: string; description?: string; due_on?: string; state?: string },
+  ): Promise<Milestone> {
+    return this.request(
+      `${this.repoBase(owner, repo)}/milestones/${ForgejoClient.seg(String(id))}`,
+      { method: 'PATCH', body: edit },
+    );
+  }
+
+  async deleteMilestone(
+    owner: string,
+    repo: string,
+    id: string | number,
+  ): Promise<DeleteMilestoneResult> {
+    await this.request(
+      `${this.repoBase(owner, repo)}/milestones/${ForgejoClient.seg(String(id))}`,
+      { method: 'DELETE' },
+    );
+    return { deleted: true, id };
   }
 
   listLabels(
