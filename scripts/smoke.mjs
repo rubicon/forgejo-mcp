@@ -15,11 +15,13 @@ import { fileURLToPath } from 'node:url';
 // 27 (through #42) + 6 PR reviews/metadata tools (#52) + set_issue_state (#77)
 // + get_pull_request_files (#85) + remove_label (#88) + edit_issue (#123)
 // + 5 milestone tools (#124) + 2 comment tools (#125) + 2 commit-status tools
-// (#126) + delete_file (#128) + 3 label tools (#127) = 50 base tools; the
-// elevated tier adds 5, delete_label among them.
-const BASE_TOOLS = 50;
+// (#126) + delete_file (#128) + 3 label tools (#127) + 3 release reads and
+// edit (#129) = 53 base tools; the elevated tier adds 7, with delete_release
+// and delete_tag joining it in #129.
+const BASE_TOOLS = 53;
 const ELEVATED_TOOLS = [
   'merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo', 'delete_label',
+  'delete_release', 'delete_tag',
 ];
 const EXPECTED_NAMES = [
   'create_release',
@@ -59,6 +61,9 @@ const EXPECTED_NAMES = [
   'create_label',
   'edit_label',
   'get_label',
+  'get_release_by_tag',
+  'get_latest_release',
+  'edit_release',
 ];
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const serverPath = join(root, 'dist', 'index.js');
@@ -248,7 +253,7 @@ const READ_ONLY = [
   'get_pull_request_diff', 'get_pull_request_files', 'get_commit_status', 'list_branches',
   'get_branch', 'list_commits', 'get_commit', 'list_releases', 'get_release', 'list_tags',
   'get_tag', 'list_pull_request_reviews', 'list_labels', 'list_milestones', 'get_milestone',
-  'list_commit_statuses', 'get_label',
+  'list_commit_statuses', 'get_label', 'get_release_by_tag', 'get_latest_release',
 ];
 // Not additive. The MCP definition of destructiveHint is "performs only additive
 // updates" when false, which is narrower than "irreversible": replacing a file,
@@ -256,6 +261,7 @@ const READ_ONLY = [
 // only some of them are hard to undo. Severity lives in the description.
 const DESTRUCTIVE = [
   'merge_pull_request', 'delete_branch', 'delete_repo', 'delete_label',
+  'delete_release', 'delete_tag', 'edit_release',
   'update_file', 'remove_label', 'set_issue_state', 'edit_issue',
   'edit_milestone', 'delete_milestone', 'edit_issue_comment', 'delete_issue_comment',
   'delete_file', 'edit_label',
@@ -268,7 +274,7 @@ const DESTRUCTIVE = [
 // retry safety that has not been demonstrated is worse than omitting the hint.
 const IDEMPOTENT = [
   'add_labels', 'set_issue_state', 'edit_issue', 'edit_milestone', 'edit_issue_comment',
-  'edit_label',
+  'edit_label', 'edit_release',
 ];
 
 function checkAnnotations(tools, { elevated }) {
@@ -459,6 +465,16 @@ function checkToolSchemas(tools) {
     fail(`schema: edit_label must require only owner, repo and id, got [${labelEdit.required}]`);
   }
 
+  // A release is identified by its numeric id everywhere it is edited or
+  // deleted, and by tag only where the API offers a tag-keyed read.
+  const releaseEdit = schemaOf(tools, 'edit_release');
+  if ((releaseEdit.required ?? []).join(',') !== 'owner,repo,id') {
+    fail(`schema: edit_release must require only owner, repo and id, got [${releaseEdit.required}]`);
+  }
+  if (!schemaOf(tools, 'get_release_by_tag').properties?.tag) {
+    fail('schema: get_release_by_tag must expose tag');
+  }
+
   const del = schemaOf(tools, 'delete_file');
   if (!(del.required ?? []).includes('sha')) {
     fail('schema: delete_file must require sha (the API rejects a delete without it)');
@@ -559,6 +575,9 @@ async function checkRequestContract() {
           { owner: 'o', repo: 'r', name: 'needs triage', color: '#ff0000', description: 'triage me' },
         ],
         ['edit_label', { owner: 'o', repo: 'r', id: 12, color: '#00ff00' }],
+        ['get_release_by_tag', { owner: 'o', repo: 'r', tag: 'v1.0/rc1' }],
+        ['get_latest_release', { owner: 'o', repo: 'r' }],
+        ['edit_release', { owner: 'o', repo: 'r', id: 21, body: 'revised notes' }],
         ['get_label', { owner: 'o', repo: 'r', id: 13 }],
         [
           'delete_file',
@@ -631,6 +650,19 @@ async function checkRequestContract() {
       }
 
       // Same empty-edit trap as edit_issue, same answer.
+      {
+        const rejected = await rpc.request('tools/call', {
+          name: 'edit_release',
+          arguments: { owner: 'bad', repo: 'reledit', id: 5 },
+        });
+        if (!rejected?.isError) {
+          fail('contract: edit_release must reject a call that names no field to change');
+        }
+        if (stub.received.some((entry) => entry.url.includes('/repos/bad/reledit'))) {
+          fail('contract: edit_release must not send an empty edit to the API');
+        }
+      }
+
       {
         const rejected = await rpc.request('tools/call', {
           name: 'edit_label',
@@ -808,6 +840,23 @@ async function checkRequestContract() {
       );
       if (labelDeleted.length !== 1) {
         fail('contract: delete_label must DELETE the label definition path');
+      }
+
+      // Both deletes are elevated: neither the release notes and assets nor a
+      // tag that was the only pointer to its commits can be restored from here.
+      for (const [name, args, method, url] of [
+        ['delete_release', { owner: 'o', repo: 'r', id: 31 }, 'DELETE', '/api/v1/repos/o/r/releases/31'],
+        ['delete_tag', { owner: 'o', repo: 'r', tag: 'v0.9/old' }, 'DELETE', '/api/v1/repos/o/r/tags/v0.9%2Fold'],
+      ]) {
+        const gone = await elevated.request('tools/call', { name, arguments: args });
+        if (gone?.isError) {
+          fail(`contract: ${name} returned an error: ${gone.content?.[0]?.text ?? '(no text)'}`);
+        }
+        const sent = stub.received.filter((e) => e.method === method && e.url === url).pop();
+        if (!sent) fail(`contract: ${name} must ${method} ${url}`);
+        if (sent.auth !== 'token smoke-stub-elevated-token') {
+          fail(`contract: ${name} is elevated and must carry the elevated token, carried ${sent.auth}`);
+        }
       }
 
       // #112 fixed an elevated tool running under the everyday token. Nothing
@@ -1089,6 +1138,20 @@ async function checkRequestContract() {
   }
   if (deleted.body?.message !== 'chore: drop stale notes') {
     fail(`contract: delete_file must forward the commit message, sent ${JSON.stringify(deleted.body)}`);
+  }
+
+  if (!only('GET', '/api/v1/repos/o/r/releases/tags/v1.0%2Frc1')) {
+    fail('contract: get_release_by_tag must encode the tag into a single path segment');
+  }
+  if (!only('GET', '/api/v1/repos/o/r/releases/latest')) {
+    fail('contract: get_latest_release must GET the latest-release path');
+  }
+  const releaseEdited = only('PATCH', '/api/v1/repos/o/r/releases/21');
+  if (Object.keys(releaseEdited.body ?? {}).join(',') !== 'body') {
+    fail(
+      'contract: edit_release must send only the fields provided, sent ' +
+        Object.keys(releaseEdited.body ?? {}).join(','),
+    );
   }
 
   const labelCreated = only('POST', '/api/v1/repos/o/r/labels');

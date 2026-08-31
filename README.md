@@ -54,6 +54,9 @@ to the safe default described above.
 | `list_commits` | read | List commits; filter by start ref and path; paginated |
 | `get_commit` | read | A single commit by SHA or ref |
 | `list_releases` | read | List releases; paginated |
+| `get_release_by_tag` | read | A release by tag name rather than numeric id |
+| `get_latest_release` | read | The current non-draft, non-prerelease release |
+| `edit_release` | write | Edit release notes, name, tag, draft/prerelease flags |
 | `get_release` | read | A single release by ID, with notes and draft/prerelease flags |
 | `create_release` | write | Create a release for a tag (draft, prerelease, notes) |
 | `list_tags` | read | List tags with their target commits; paginated |
@@ -185,7 +188,8 @@ mcp__forgejo
 
 **If you turn on the elevated tier, do _not_ do this** — a blanket allowlist
 would let every elevated tool run without a prompt: `merge_pull_request`,
-`delete_branch`, `create_repo`, `delete_repo` and `delete_label`. Allowlist named default tools
+`delete_branch`, `create_repo`, `delete_repo`, `delete_label`, `delete_release` and
+`delete_tag`. Allowlist named default tools
 only, never an elevated one, and never `delete_repo` under any circumstances —
 its `confirm` argument catches a malformed call, not a misled one. For example:
 

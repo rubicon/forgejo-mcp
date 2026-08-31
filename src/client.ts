@@ -22,6 +22,8 @@ import type {
   CommitStatusEntry,
   DeleteCommentResult,
   DeleteLabelResult,
+  DeleteReleaseResult,
+  DeleteTagResult,
   DeleteMilestoneResult,
   Milestone,
   RemoveLabelResult,
@@ -782,6 +784,61 @@ export class ForgejoClient {
       method: 'DELETE',
     });
     return { deleted: true, id };
+  }
+
+  getReleaseByTag(owner: string, repo: string, tag: string): Promise<Release> {
+    return this.request(
+      `${this.repoBase(owner, repo)}/releases/tags/${ForgejoClient.seg(tag)}`,
+    );
+  }
+
+  getLatestRelease(owner: string, repo: string): Promise<Release> {
+    return this.request(`${this.repoBase(owner, repo)}/releases/latest`);
+  }
+
+  /** Edit a release. Only the named fields are sent. */
+  editRelease(
+    owner: string,
+    repo: string,
+    id: number,
+    edit: {
+      tag_name?: string;
+      target_commitish?: string;
+      name?: string;
+      body?: string;
+      draft?: boolean;
+      prerelease?: boolean;
+    },
+  ): Promise<Release> {
+    return this.request(`${this.repoBase(owner, repo)}/releases/${id}`, {
+      method: 'PATCH',
+      body: edit,
+    });
+  }
+
+  /**
+   * Delete a release. Elevated: the notes and any uploaded assets live in the
+   * forge rather than in git, so nothing here or in a clone can restore them.
+   * The underlying tag is left in place.
+   */
+  async deleteRelease(owner: string, repo: string, id: number): Promise<DeleteReleaseResult> {
+    await this.requestElevated(`${this.repoBase(owner, repo)}/releases/${id}`, {
+      method: 'DELETE',
+    });
+    return { deleted: true, id };
+  }
+
+  /**
+   * Delete a tag. Elevated: if the tagged commits are not reachable from a
+   * branch, the tag was their only pointer and deleting it orphans them, which
+   * is the reasoning that placed delete_branch in the same tier.
+   */
+  async deleteTag(owner: string, repo: string, tag: string): Promise<DeleteTagResult> {
+    await this.requestElevated(
+      `${this.repoBase(owner, repo)}/tags/${ForgejoClient.seg(tag)}`,
+      { method: 'DELETE' },
+    );
+    return { deleted: true, tag };
   }
 
   listLabels(

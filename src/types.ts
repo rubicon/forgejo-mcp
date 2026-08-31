@@ -110,6 +110,16 @@ export interface Label {
   color: string;
 }
 
+export interface DeleteReleaseResult {
+  deleted: boolean;
+  id: number;
+}
+
+export interface DeleteTagResult {
+  deleted: boolean;
+  tag: string;
+}
+
 export interface DeleteLabelResult {
   deleted: boolean;
   id: number;

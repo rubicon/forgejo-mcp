@@ -24,7 +24,7 @@ delete branch.**
 ```bash
 npm install
 npm run build      # esbuild -> dist/index.js (single bundled file)
-npm run smoke      # build + handshake; asserts BASE_TOOLS in scripts/smoke.mjs (currently 50) + version == package.json
+npm run smoke      # build + handshake; asserts BASE_TOOLS in scripts/smoke.mjs (currently 53) + version == package.json
 npm run typecheck  # tsc --noEmit
 ```
 
@@ -36,7 +36,7 @@ in `src/index.ts`. Do not hardcode a version literal.
 
 See `ARCHITECTURE.md`. In brief: `src/index.ts` wires MCP over stdio;
 `src/client.ts` is the typed Forgejo REST client; `src/tools.ts` holds the tool
-definitions and handlers (50 base `tools` + 5 opt-in `elevatedTools`);
+definitions and handlers (53 base `tools` + 7 opt-in `elevatedTools`);
 `src/types.ts` has the API response shapes.
 esbuild bundles everything to a single `dist/index.js`. `scripts/smoke.mjs` is
 the only check.
@@ -52,22 +52,29 @@ the only check.
     server: `merge_pull_request` (integrates code into a branch others build on),
     `delete_branch` (may lose unmerged commits), `create_repo` (chooses its own
     visibility, so a public one is somewhere to copy private content to),
-    `delete_repo` (no undo by any means), and `delete_label` (strips the label
+    `delete_repo` (no undo by any means), `delete_label` (strips the label
     from every issue and pull request that carried it, and neither the label nor
-    those associations can be restored).
+    those associations can be restored), `delete_release` (notes and assets do
+    not live in `git`), and `delete_tag` (may orphan commits no branch reaches).
 
     Note what this boundary is *not*: "writes to the default branch" would pull
     in `create_file` and `update_file`, which target the default branch when no
     branch is given. Those stay in the default surface deliberately — the damage
     is a recorded commit and `git` can revert it.
 
-    `create_release` and `create_tag` also default to the default branch and are
-    also in the default surface, but on weaker grounds: they add rather than
-    destroy, yet **this server exposes no way to undo them**, because the delete
-    endpoints are not implemented. That asymmetry is known and tolerated while
-    the surface is additive-only there. If deletion of tags or releases is ever
-    added, revisit which tier all four belong to rather than assuming this
-    placement still holds.
+    `create_release` and `create_tag` also default to the default branch and
+    stay in the default surface. They were previously defended on the grounds
+    that the release surface was additive-only, which was the same reasoning
+    retired everywhere else; that defence is gone, and the placement now rests
+    on the same test as everything else. Creating a release or a tag is a
+    recorded, visible act that `delete_release` and `delete_tag` can undo.
+
+    Those two deletes are elevated, resolved in #129. A release carries notes
+    and uploaded assets that never existed in `git`, so no clone can restore
+    them; a tag may be the only pointer to its commits, which is the reasoning
+    that placed `delete_branch` in the tier. Do not reconstruct the
+    additive-only justification as a correction: it was retired, not
+    overlooked.
     Double-gated and fail-closed. All three must hold or the surface is
     byte-identical to the default: `FORGEJO_MCP_ELEVATED=1`, a `FORGEJO_TOKEN`
     that is set, and a `FORGEJO_MCP_ELEVATED_TOKEN` that differs from it. Do not
