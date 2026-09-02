@@ -16,9 +16,10 @@ import { fileURLToPath } from 'node:url';
 // + get_pull_request_files (#85) + remove_label (#88) + edit_issue (#123)
 // + 5 milestone tools (#124) + 2 comment tools (#125) + 2 commit-status tools
 // (#126) + delete_file (#128) + 3 label tools (#127) + 3 release reads and
-// edit (#129) = 53 base tools; the elevated tier adds 6, with delete_release
-// and delete_tag joining it in #129 and create_repo removed in #142.
-const BASE_TOOLS = 53;
+// edit (#129) + edit_pull_request (#130) = 54 base tools; the elevated tier
+// adds 6, with delete_release and delete_tag joining it in #129 and create_repo
+// removed in #142.
+const BASE_TOOLS = 54;
 const ELEVATED_TOOLS = [
   'merge_pull_request', 'delete_branch', 'delete_repo', 'delete_label',
   'delete_release', 'delete_tag',
@@ -48,6 +49,7 @@ const EXPECTED_NAMES = [
   'get_pull_request_files',
   'remove_label',
   'edit_issue',
+  'edit_pull_request',
   'list_milestones',
   'get_milestone',
   'create_milestone',
@@ -262,7 +264,7 @@ const READ_ONLY = [
 const DESTRUCTIVE = [
   'merge_pull_request', 'delete_branch', 'delete_repo', 'delete_label',
   'delete_release', 'delete_tag', 'edit_release',
-  'update_file', 'remove_label', 'set_issue_state', 'edit_issue',
+  'update_file', 'remove_label', 'set_issue_state', 'edit_issue', 'edit_pull_request',
   'edit_milestone', 'delete_milestone', 'edit_issue_comment', 'delete_issue_comment',
   'delete_file', 'edit_label',
 ];
@@ -273,8 +275,8 @@ const DESTRUCTIVE = [
 // POSTs and its remote side effects on a repeat are unverified. Advertising
 // retry safety that has not been demonstrated is worse than omitting the hint.
 const IDEMPOTENT = [
-  'add_labels', 'set_issue_state', 'edit_issue', 'edit_milestone', 'edit_issue_comment',
-  'edit_label', 'edit_release',
+  'add_labels', 'set_issue_state', 'edit_issue', 'edit_pull_request', 'edit_milestone',
+  'edit_issue_comment', 'edit_label', 'edit_release',
 ];
 
 function checkAnnotations(tools, { elevated }) {
@@ -702,6 +704,79 @@ async function checkRequestContract() {
         }
         if (stub.received.some((entry) => entry.url.includes('/repos/bad/noedit'))) {
           fail('contract: edit_issue must not send an empty edit to the API');
+        }
+      }
+
+      // edit_pull_request rides PATCH /pulls/{index}, which is a different
+      // endpoint from the issues one edit_issue uses (#130). Only the named
+      // fields may travel, and `base` must never travel at all: retargeting an
+      // open pull request changes what a merge would integrate, and the tool is
+      // deliberately unable to do it.
+      {
+        await rpc.request('tools/call', {
+          name: 'edit_pull_request',
+          arguments: {
+            owner: 'o', repo: 'r', index: 9,
+            title: 'retitled', state: 'closed', allow_maintainer_edit: true,
+            base: 'main',
+          },
+        });
+        const sent = stub.received
+          .filter((e) => e.method === 'PATCH' && e.url === '/api/v1/repos/o/r/pulls/9')
+          .pop();
+        if (!sent) fail('contract: edit_pull_request must PATCH /repos/{owner}/{repo}/pulls/{index}');
+        if (sent.body?.title !== 'retitled' || sent.body?.state !== 'closed') {
+          fail(`contract: edit_pull_request must send the named fields, sent ${JSON.stringify(sent.body)}`);
+        }
+        if (sent.body?.allow_maintainer_edit !== true) {
+          fail('contract: edit_pull_request must forward allow_maintainer_edit');
+        }
+        if ('base' in (sent.body ?? {})) {
+          fail(`contract: edit_pull_request must never forward base, sent ${JSON.stringify(sent.body)}`);
+        }
+        if ('body' in (sent.body ?? {})) {
+          fail('contract: edit_pull_request must omit fields the caller did not name');
+        }
+      }
+
+      // An edit naming no field would PATCH an empty body and read as success.
+      {
+        const rejected = await rpc.request('tools/call', {
+          name: 'edit_pull_request',
+          arguments: { owner: 'bad', repo: 'nopredit', index: 3 },
+        });
+        if (!rejected?.isError) {
+          fail('contract: edit_pull_request must reject an edit that names no field');
+        }
+        if (stub.received.some((e) => e.url.includes('/repos/bad/nopredit'))) {
+          fail('contract: edit_pull_request must not send an empty edit to the API');
+        }
+      }
+
+      // `base` alone is not an edit: it must be refused, not silently dropped
+      // and treated as a no-field edit that still reaches the API.
+      {
+        const rejected = await rpc.request('tools/call', {
+          name: 'edit_pull_request',
+          arguments: { owner: 'bad', repo: 'baseonly', index: 4, base: 'main' },
+        });
+        if (!rejected?.isError) {
+          fail('contract: edit_pull_request must reject an edit naming only base');
+        }
+        if (stub.received.some((e) => e.url.includes('/repos/bad/baseonly'))) {
+          fail('contract: edit_pull_request must not send a base-only edit to the API');
+        }
+      }
+
+      // The schema advertises an enum; nothing enforces a schema, so the handler
+      // must, exactly as the rest of the surface does.
+      {
+        const rejected = await rpc.request('tools/call', {
+          name: 'edit_pull_request',
+          arguments: { owner: 'bad', repo: 'badstate', index: 5, state: 'merged' },
+        });
+        if (!rejected?.isError) {
+          fail('contract: edit_pull_request must reject a state outside open/closed');
         }
       }
 
