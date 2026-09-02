@@ -16,11 +16,11 @@ import { fileURLToPath } from 'node:url';
 // + get_pull_request_files (#85) + remove_label (#88) + edit_issue (#123)
 // + 5 milestone tools (#124) + 2 comment tools (#125) + 2 commit-status tools
 // (#126) + delete_file (#128) + 3 label tools (#127) + 3 release reads and
-// edit (#129) = 53 base tools; the elevated tier adds 7, with delete_release
-// and delete_tag joining it in #129.
+// edit (#129) = 53 base tools; the elevated tier adds 6, with delete_release
+// and delete_tag joining it in #129 and create_repo removed in #142.
 const BASE_TOOLS = 53;
 const ELEVATED_TOOLS = [
-  'merge_pull_request', 'delete_branch', 'create_repo', 'delete_repo', 'delete_label',
+  'merge_pull_request', 'delete_branch', 'delete_repo', 'delete_label',
   'delete_release', 'delete_tag',
 ];
 const EXPECTED_NAMES = [
@@ -884,28 +884,6 @@ async function checkRequestContract() {
       ).pop();
       if (ordinary?.auth !== 'token smoke-stub-token') {
         fail(`contract: edit_label is a default tool and must carry the everyday token, carried ${ordinary?.auth}`);
-      }
-
-      // A repository is the one thing an agent can create whose visibility it also
-      // chooses, so private is the default and public must be asked for.
-      // Only a literal boolean false may publish. Schemas are advisory here, so a
-      // client sending the string "false" must not be read as a request to publish.
-      for (const [args, wantPrivate] of [
-        [{ name: 'scratch-repo' }, true],
-        [{ name: 'p-string', private: 'false' }, true],
-        [{ name: 'p-null', private: null }, true],
-        [{ name: 'p-zero', private: 0 }, true],
-        [{ name: 'p-false', private: false }, false],
-      ]) {
-        const made = await elevated.request('tools/call', { name: 'create_repo', arguments: args });
-        if (made?.isError) fail(`contract: create_repo errored for ${JSON.stringify(args)}`);
-        const sent = stub.received.filter((e) => e.method === 'POST' && e.url === '/api/v1/user/repos').pop();
-        if (sent?.body?.private !== wantPrivate) {
-          fail(
-            `contract: create_repo with ${JSON.stringify(args.private)} must send ` +
-              `private=${wantPrivate}, sent ${JSON.stringify(sent?.body?.private)}`,
-          );
-        }
       }
 
       // Deleting a repository is the only operation here with no undo, so the

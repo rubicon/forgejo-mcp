@@ -188,7 +188,7 @@ mcp__forgejo
 
 **If you turn on the elevated tier, do _not_ do this** — a blanket allowlist
 would let every elevated tool run without a prompt: `merge_pull_request`,
-`delete_branch`, `create_repo`, `delete_repo`, `delete_label`, `delete_release` and
+`delete_branch`, `delete_repo`, `delete_label`, `delete_release` and
 `delete_tag`. Allowlist named default tools
 only, never an elevated one, and never `delete_repo` under any circumstances —
 its `confirm` argument catches a malformed call, not a misled one. For example:
@@ -204,21 +204,21 @@ section below.
 ## Elevated tier (opt-in, off by default)
 
 The server can optionally expose a **minimal set of high-blast-radius tools**:
-operations that destroy work, plus repository creation, where the caller chooses
-the visibility. This
+operations that destroy work in ways this server cannot undo. This
 tier is **off by default** and must be deliberately enabled by the operator.
 
 | Tool | Kind | Operation |
 |------|------|-----------|
 | `merge_pull_request` | elevated | Merge a PR (`merge` / `rebase` / `squash`) into its base branch, pinned to a required `head_commit_id`; pass `delete_branch_after_merge` to clean up the head branch |
 | `delete_branch` | elevated | Permanently delete a branch |
-| `create_repo` | elevated | Create a repository; private unless `private: false` is passed |
 | `delete_repo` | elevated | Permanently delete a repository; `confirm` must equal `owner/repo` |
+| `delete_label` | elevated | Permanently delete a label definition, stripping it from every issue and pull request that carried it |
+| `delete_release` | elevated | Permanently delete a release; its notes and uploaded assets do not exist in `git` |
+| `delete_tag` | elevated | Permanently delete a tag; if its commits are unreachable from any branch, deleting it orphans them |
 
-Elevated tool descriptions are prefixed `[ELEVATED]`, and the ones that destroy
-something use `[ELEVATED — DESTRUCTIVE]`. `create_repo` carries the plain prefix:
-it is gated for choosing its own visibility, not for destroying anything, and its
-`destructiveHint` annotation is `false` to match.
+Every elevated tool is prefixed `[ELEVATED — DESTRUCTIVE]` and carries
+`destructiveHint: true`. The tier holds nothing else: a tool that does not destroy
+something this server cannot restore belongs in the default surface.
 
 `delete_repo` **requires** `confirm` to equal `owner/repo` exactly. Be clear about
 what that buys: it catches a malformed or half-specified call, and nothing more.
@@ -226,11 +226,6 @@ Both `confirm` and the target come from the same tool-call arguments, so text
 injected into an issue can satisfy it as easily as a careful caller. Deleting a
 repository is the only operation here with no undo of any kind, so **never
 allowlist `delete_repo`** — the per-call approval prompt is the actual guard.
-
-`create_repo` creates a **private** repository unless `private: false` is passed
-deliberately. A repository is the one thing an agent can create whose visibility
-it also chooses, which is what would make a public one a place to copy private
-content into.
 
 `merge_pull_request` **requires** `head_commit_id` — the head SHA from
 `get_pull_request`. Forgejo refuses the merge if the branch has moved since that
@@ -296,8 +291,8 @@ Therefore, when the elevated tier is on:
 - **Do NOT blanket-allow the whole server** (`mcp__forgejo`).
 - **Allowlist only the specific safe tools** you want to run autonomously
   (e.g. `mcp__forgejo__create_issue`), and leave every elevated tool —
-  `merge_pull_request`, `delete_branch`, `create_repo` and `delete_repo` —
-  prompting on every call. `delete_repo` should never be allowlisted at all: its
+  `merge_pull_request`, `delete_branch`, `delete_repo`, `delete_label`,
+  `delete_release` and `delete_tag` — prompting on every call. `delete_repo` should never be allowlisted at all: its
   `confirm` argument catches a malformed call, not a misled one.
 
 The server cannot enforce the client's allowlist — distinct tool naming and this

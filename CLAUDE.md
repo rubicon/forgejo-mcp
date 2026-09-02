@@ -36,7 +36,7 @@ in `src/index.ts`. Do not hardcode a version literal.
 
 See `ARCHITECTURE.md`. In brief: `src/index.ts` wires MCP over stdio;
 `src/client.ts` is the typed Forgejo REST client; `src/tools.ts` holds the tool
-definitions and handlers (53 base `tools` + 7 opt-in `elevatedTools`);
+definitions and handlers (53 base `tools` + 6 opt-in `elevatedTools`);
 `src/types.ts` has the API response shapes.
 esbuild bundles everything to a single `dist/index.js`. `scripts/smoke.mjs` is
 the only check.
@@ -50,8 +50,7 @@ the only check.
     `update_file` does: the change is recorded and a person can see it.
   - **Elevated tier** — operations whose damage cannot be undone from this
     server: `merge_pull_request` (integrates code into a branch others build on),
-    `delete_branch` (may lose unmerged commits), `create_repo` (chooses its own
-    visibility, so a public one is somewhere to copy private content to),
+    `delete_branch` (may lose unmerged commits),
     `delete_repo` (no undo by any means), `delete_label` (strips the label
     from every issue and pull request that carried it, and neither the label nor
     those associations can be restored), `delete_release` (notes and assets do
@@ -75,6 +74,20 @@ the only check.
     that placed `delete_branch` in the tier. Do not reconstruct the
     additive-only justification as a correction: it was retired, not
     overlooked.
+
+    `create_repo` was removed in #142 and must not be added back. It posted to
+    `/user/repos`, which Forgejo gates behind `write:user` — the same scope that
+    grants adding an SSH key, adding a GPG signing key, and changing the
+    account's email addresses (verified live: all four endpoints return the
+    identical `required scope(s): [write:user]`). Enabling the tool therefore
+    means handing the elevated token a scope from the **never exposed** tier
+    below, so that an agent could plant a credential outliving the token. There
+    is no narrower scope to reach for: the org-scoped `POST /orgs/{org}/repos`
+    needs `write:organization` and does not apply to a user account. The tier is
+    now uniformly destructive, every member prefixed
+    `[ELEVATED — DESTRUCTIVE]` with `destructiveHint: true`; a tool that does not
+    destroy something unrecoverable does not belong in it.
+
     Double-gated and fail-closed. All three must hold or the surface is
     byte-identical to the default: `FORGEJO_MCP_ELEVATED=1`, a `FORGEJO_TOKEN`
     that is set, and a `FORGEJO_MCP_ELEVATED_TOKEN` that differs from it. Do not

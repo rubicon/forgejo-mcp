@@ -470,25 +470,6 @@ export class ForgejoClient {
   // These run under the elevated token only; see requestElevated above.
 
   /**
-   * Merge a pull request. `head_commit_id` is sent as the API's own guard: the
-   * merge is refused if the branch head has moved since it was read, so an
-   * agent cannot merge commits that arrived after the review.
-   */
-  /**
-   * Create a repository owned by the authenticated user. `private` is decided by
-   * the caller rather than defaulted here, so the tool layer owns that choice.
-   */
-  createRepo(body: {
-    name: string;
-    description?: string;
-    private: boolean;
-    auto_init?: boolean;
-    default_branch?: string;
-  }): Promise<Repository> {
-    return this.requestElevated('/user/repos', { method: 'POST', body });
-  }
-
-  /**
    * Delete a repository. There is no undo: issues, pull requests and history go
    * with it. The caller-confirmation guard lives in the tool layer.
    */
@@ -497,6 +478,11 @@ export class ForgejoClient {
     return { deleted: true, repository: `${owner}/${repo}` };
   }
 
+  /**
+   * Merge a pull request. `head_commit_id` is sent as the API's own guard: the
+   * merge is refused if the branch head has moved since it was read, so an
+   * agent cannot merge commits that arrived after the review.
+   */
   async mergePullRequest(
     owner: string,
     repo: string,

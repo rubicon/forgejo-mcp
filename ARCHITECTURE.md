@@ -24,8 +24,9 @@ framework and no persistent state.
 
 The default surface is reads plus writes whose damage is visible and cheap to
 undo; a tool is placed by blast radius rather than by whether it only adds.
-Operations that destroy work or hand an agent a surface of its own choosing —
-`merge_pull_request`, `delete_branch`, `create_repo` and `delete_repo` — live in
+Operations that destroy something this server cannot restore —
+`merge_pull_request`, `delete_branch`, `delete_repo`, `delete_label`,
+`delete_release` and `delete_tag` — live in
 a separate `elevatedTools` array that `src/index.ts` concatenates onto the registry **only**
 when all three of these hold: `FORGEJO_MCP_ELEVATED=1`, a `FORGEJO_TOKEN` that is
 set, and a `FORGEJO_MCP_ELEVATED_TOKEN` that differs from it.
