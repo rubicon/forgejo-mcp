@@ -6,25 +6,71 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.17.0](https://github.com/rubicon/forgejo-mcp/compare/v0.16.0...v0.17.0) (2026-09-02)
 
+This server could open a pull request and it could merge one, but it could not fix a typo in the title of one. The gap came from a rule this project retired back in [#118](https://github.com/rubicon/forgejo-mcp/pull/118), and nothing had been holding it since except nobody going back to check what the retirement freed up. `edit_pull_request` closes it, and it is the last tool the workflow was actually missing. The base branch stays out deliberately, because retargeting an open pull request changes what a merge would integrate, which is a different question from fixing a sentence.
 
 ### Added
 
-* **tools:** add edit_pull_request ([#146](https://github.com/rubicon/forgejo-mcp/issues/146)) ([fe5064f](https://github.com/rubicon/forgejo-mcp/commit/fe5064f836a91947a8a3fc2d02cf5a8d22842685)), closes [#130](https://github.com/rubicon/forgejo-mcp/issues/130)
+* **tools:** add `edit_pull_request` ([#146](https://github.com/rubicon/forgejo-mcp/pull/146)) ([fe5064f](https://github.com/rubicon/forgejo-mcp/commit/fe5064f836a91947a8a3fc2d02cf5a8d22842685)), closes [#130](https://github.com/rubicon/forgejo-mcp/issues/130). Thanks to [Dax Davis](https://github.com/rubicon).
+
+It edits title, body, state, assignees, labels, milestone, due date, and whether
+maintainers may push to the head branch. Only the fields you pass change. The
+default surface goes from 53 tools to 54, and the full surface from 59 to 60.
+
+This is a distinct endpoint rather than an alias for `edit_issue`.
+`PATCH /repos/{owner}/{repo}/pulls/{index}` takes `EditPullRequestOption`, which
+carries `allow_maintainer_edit` with no equivalent on the issue schema, so
+widening `edit_issue` was never going to reach it.
+
+### What is deliberately absent
+
+`base` is neither advertised in the schema nor forwarded if you pass it.
+Retargeting an open pull request changes what a merge would integrate, which is a
+larger blast radius than a prose edit, and it is deferred as demand driven like
+the rest of the long tail. Close the pull request and open a replacement with
+`create_pull_request`, which already requires `base`. What that costs is the
+review thread on the original, not the capability.
+
+### Known limitations
+
+`EditPullRequestOption` has no concurrency guard. There is no `sha` equivalent to
+the one `update_file` carries, so an edit replaces the previous text outright and
+two agents editing the same pull request will overwrite each other without
+warning. The tool description says so at the point of use, which is the same
+answer this project gave for `edit_issue`.
 
 ## [0.16.0](https://github.com/rubicon/forgejo-mcp/compare/v0.15.0...v0.16.0) (2026-09-02)
 
+`create_repo` had been in the elevated tier since [#106](https://github.com/rubicon/forgejo-mcp/issues/106) and had never once worked. It posts to an endpoint Forgejo gates behind `write:user`, which is the same scope that adds SSH keys and changes the account's email addresses, so granting it was never the smaller risk. Removing the tool leaves the tier with the one property worth having, which is that everything in it destroys something and nothing in it is there for another reason. The less comfortable find was sitting next to it. Two of the three places that tell you what to allowlist had been describing a four-tool tier since [#127](https://github.com/rubicon/forgejo-mcp/issues/127) added a fifth.
 
-### ⚠ BREAKING CHANGES
+### ⚠ Breaking changes
 
-* **elevated:** create_repo is removed from the elevated tier. The elevated surface is now 6 tools and the full surface 59.
+* `create_repo` is removed. The elevated tier goes from seven tools to six, and
+  the full surface from 60 to 59. There is no replacement: create repositories in
+  the Forgejo web UI or with a token you control directly.
 
 ### Fixed
 
-* **elevated:** remove create_repo and correct every tier enumeration ([#144](https://github.com/rubicon/forgejo-mcp/issues/144)) ([9faf8c3](https://github.com/rubicon/forgejo-mcp/commit/9faf8c39df13ecc2a0c5df9caa3f07bb9207770c)), closes [#142](https://github.com/rubicon/forgejo-mcp/issues/142) [#143](https://github.com/rubicon/forgejo-mcp/issues/143)
+* **elevated:** remove `create_repo` and correct every tier enumeration ([#144](https://github.com/rubicon/forgejo-mcp/pull/144)) ([9faf8c3](https://github.com/rubicon/forgejo-mcp/commit/9faf8c39df13ecc2a0c5df9caa3f07bb9207770c)), closes [#142](https://github.com/rubicon/forgejo-mcp/issues/142) and [#143](https://github.com/rubicon/forgejo-mcp/issues/143). Thanks to [Dax Davis](https://github.com/rubicon).
 
-## [Unreleased]
+### Why the tool went rather than the scope
 
-Nothing yet.
+`POST /user/repos` returns `403 token does not have at least one of required
+scope(s): [write:user]` for every token this server is designed to hold. The same
+scope gates `POST /user/emails`, `POST /user/keys` and `POST /user/gpg_keys`, so
+an elevated token carrying it could plant an SSH key that outlives the token that
+planted it. That is the account administration this project puts permanently out
+of scope, and no narrower scope exists: the organisation-scoped path needs
+`write:organization` and does not apply to a user account.
+
+### Documentation
+
+The README tier table, the README security warning and `ARCHITECTURE.md` all
+still listed the four-tool tier from before [#127](https://github.com/rubicon/forgejo-mcp/issues/127)
+and [#129](https://github.com/rubicon/forgejo-mcp/issues/129). Two of those are
+allowlisting guidance, so a reader working from either would have believed they
+had enumerated the elevated surface while three irreversible tools were missing
+from the list they checked. All five places that name the tier now agree with the
+registry, and that agreement is checked rather than eyeballed.
 
 ## [0.15.0](https://github.com/rubicon/forgejo-mcp/compare/v0.14.0...v0.15.0) (2026-08-31)
 
@@ -233,3 +279,5 @@ Forgejo/Gitea, licensed under Apache-2.0.
 - Runtime configuration via `FORGEJO_BASE_URL` and `FORGEJO_TOKEN`; no secrets
   are hardcoded.
 - Node-native esbuild build and a token-free MCP smoke test.
+
+[Unreleased]: https://github.com/rubicon/forgejo-mcp/compare/v0.17.0...HEAD
