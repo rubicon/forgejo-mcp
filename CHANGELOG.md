@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0](https://github.com/rubicon/forgejo-mcp/compare/v0.15.0...v0.16.0) (2026-09-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **elevated:** create_repo is removed from the elevated tier. The elevated surface is now 6 tools and the full surface 59.
+
+### Fixed
+
+* **elevated:** remove create_repo and correct every tier enumeration ([#144](https://github.com/rubicon/forgejo-mcp/issues/144)) ([9faf8c3](https://github.com/rubicon/forgejo-mcp/commit/9faf8c39df13ecc2a0c5df9caa3f07bb9207770c)), closes [#142](https://github.com/rubicon/forgejo-mcp/issues/142) [#143](https://github.com/rubicon/forgejo-mcp/issues/143)
+
 ## [Unreleased]
 
 Nothing yet.
