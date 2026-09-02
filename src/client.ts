@@ -398,6 +398,42 @@ export class ForgejoClient {
     return this.request(`${this.repoBase(owner, repo)}/pulls/${index}`);
   }
 
+  /**
+   * Edit a pull request. This is `PATCH /pulls/{index}`, a different endpoint from
+   * the one `editIssue` uses: `EditPullRequestOption` carries `allow_maintainer_edit`,
+   * which the issue schema has no equivalent for.
+   *
+   * Only the fields the caller named are sent. The endpoint replaces what it
+   * receives and offers no `sha` guard, so passing an unchanged value back would
+   * overwrite a concurrent edit instead of leaving it alone.
+   *
+   * `base` is deliberately absent from the accepted shape. Retargeting an open
+   * pull request changes what a merge would integrate, which is a different blast
+   * radius from a prose edit; it is deferred as demand-driven. See #130, and do
+   * not add it here as an oversight fix.
+   */
+  editPullRequest(
+    owner: string,
+    repo: string,
+    index: number,
+    edit: {
+      title?: string;
+      body?: string;
+      state?: string;
+      assignees?: string[];
+      labels?: number[];
+      milestone?: number;
+      due_date?: string;
+      unset_due_date?: boolean;
+      allow_maintainer_edit?: boolean;
+    },
+  ): Promise<PullRequest> {
+    return this.request(`${this.repoBase(owner, repo)}/pulls/${index}`, {
+      method: 'PATCH',
+      body: edit,
+    });
+  }
+
   getPullRequestDiff(owner: string, repo: string, index: number): Promise<string> {
     return this.requestText(`${this.repoBase(owner, repo)}/pulls/${index}.diff`);
   }

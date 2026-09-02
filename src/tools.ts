@@ -1331,6 +1331,79 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
+    name: 'edit_pull_request',
+    description:
+      'Edit a pull request: title, body, state, assignees, labels, milestone, due ' +
+      'date, and whether maintainers may push to the head branch. Only the fields ' +
+      'you pass change; omit one to leave it alone. The new text replaces the old, ' +
+      'and this endpoint takes no sha, so unlike update_file there is nothing to ' +
+      'detect a simultaneous edit by someone else — theirs is overwritten without ' +
+      'warning. The base branch cannot be changed here: close the pull request and ' +
+      'open a replacement with create_pull_request.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ...ownerRepo,
+        index: { type: 'number', description: 'Pull request number' },
+        title: { type: 'string', description: 'Replacement title; omit to leave it unchanged' },
+        body: {
+          type: 'string',
+          description: 'Replacement description in Markdown; omit to leave it unchanged',
+        },
+        state: {
+          type: 'string',
+          enum: [...ISSUE_STATES],
+          description: 'Close or reopen the pull request',
+        },
+        assignees: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Assignee usernames; replaces the current list rather than adding to it',
+        },
+        labels: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Label ids; replaces the current set rather than adding to it (see list_labels)',
+        },
+        milestone: { type: 'number', description: 'Milestone id to set (see list_milestones)' },
+        due_date: { type: 'string', description: 'Due date as an RFC 3339 timestamp' },
+        unset_due_date: { type: 'boolean', description: 'Clear the due date' },
+        allow_maintainer_edit: {
+          type: 'boolean',
+          description: 'Whether maintainers may push to the head branch',
+        },
+      },
+      required: ['owner', 'repo', 'index'],
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    handler: (c, a) => {
+      // `base` is absent here and from the schema on purpose: retargeting an open
+      // pull request changes what a merge would integrate, which is a different
+      // blast radius from a prose edit (#130). A caller that passes it is not
+      // served by it — and a call naming nothing else is refused below, so the
+      // limit surfaces rather than reading as a silent success.
+      const edit = {
+        title: a.title,
+        body: a.body,
+        state: maybeOneOf(a, 'state', ISSUE_STATES),
+        assignees: a.assignees,
+        labels: a.labels,
+        milestone: a.milestone,
+        due_date: a.due_date,
+        unset_due_date: a.unset_due_date,
+        allow_maintainer_edit: a.allow_maintainer_edit,
+      };
+      if (Object.values(edit).every((value) => value === undefined)) {
+        throw new Error(
+          'edit_pull_request needs at least one of title, body, state, assignees, labels, ' +
+            'milestone, due_date, unset_due_date or allow_maintainer_edit. The base branch ' +
+            'is not editable here; open a replacement with create_pull_request.',
+        );
+      }
+      return c.editPullRequest(req(a, 'owner'), req(a, 'repo'), req(a, 'index'), edit);
+    },
+  },
+  {
     name: 'remove_label',
     description:
       'Remove one label from an issue or pull request (they share numbering). label is ' +

@@ -83,6 +83,7 @@ to the safe default described above.
 | `add_assignees` | write | Assign users to an issue or PR; existing assignees kept |
 | `set_issue_state` | write | Close or reopen an issue or PR (state only — `edit_issue` owns title/body) |
 | `edit_issue` | write | Edit the title or body of an issue or PR; only the fields you pass change |
+| `edit_pull_request` | write | Edit a PR's title, body, state, assignees, labels, milestone, due date or maintainer-edit flag; the base branch is not editable here |
 
 ### List results are paginated
 
