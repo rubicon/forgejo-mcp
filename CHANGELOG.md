@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0](https://github.com/rubicon/forgejo-mcp/compare/v0.16.0...v0.17.0) (2026-09-02)
+
+
+### Added
+
+* **tools:** add edit_pull_request ([#146](https://github.com/rubicon/forgejo-mcp/issues/146)) ([fe5064f](https://github.com/rubicon/forgejo-mcp/commit/fe5064f836a91947a8a3fc2d02cf5a8d22842685)), closes [#130](https://github.com/rubicon/forgejo-mcp/issues/130)
+
 ## [0.16.0](https://github.com/rubicon/forgejo-mcp/compare/v0.15.0...v0.16.0) (2026-09-02)
 
 
