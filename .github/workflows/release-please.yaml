@@ -40,7 +40,7 @@ jobs:
           version: 2.35.0
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-          RELEASE_PLEASE_APP_ID: 'op://Automation/lnacky4l2tmlihrockbutkub7y/app id'
+          RELEASE_PLEASE_CLIENT_ID: 'op://Automation/lnacky4l2tmlihrockbutkub7y/client id'
           RELEASE_PLEASE_APP_KEY: 'op://Automation/lnacky4l2tmlihrockbutkub7y/private key'
       # Mint a token from the `rubicon-release-please` GitHub App. Commits authored
       # via an App token are auto-verified/signed by GitHub, so the release PR
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         with:
-          app-id: ${{ steps.op.outputs.RELEASE_PLEASE_APP_ID }}
+          client-id: ${{ steps.op.outputs.RELEASE_PLEASE_CLIENT_ID }}
           private-key: ${{ steps.op.outputs.RELEASE_PLEASE_APP_KEY }}
       - uses: googleapis/release-please-action@v5
         with:
