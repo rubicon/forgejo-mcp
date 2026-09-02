@@ -1429,37 +1429,6 @@ export const elevatedTools: ToolDefinition[] = [
       }),
   },
   {
-    name: 'create_repo',
-    description:
-      '[ELEVATED] Create a repository owned by the authenticated user. Private unless ' +
-      'private is explicitly false: a repository is the one thing whose visibility the ' +
-      'caller chooses, which makes a public one a place to copy private content into.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string', description: 'Repository name' },
-        description: { type: 'string', description: 'Short description' },
-        private: {
-          type: 'boolean',
-          default: true,
-          description: 'Visibility; omit for private. Pass false deliberately to publish it.',
-        },
-        auto_init: { type: 'boolean', description: 'Create an initial commit with a README' },
-        default_branch: { type: 'string', description: 'Name for the initial branch' },
-      },
-      required: ['name'],
-    },
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-    handler: (c, a) =>
-      c.createRepo({
-        name: req(a, 'name'),
-        description: a.description,
-        private: a.private === false ? false : true,
-        auto_init: a.auto_init,
-        default_branch: a.default_branch,
-      }),
-  },
-  {
     name: 'delete_repo',
     description:
       '[ELEVATED — DESTRUCTIVE] Permanently delete a repository, with its issues, pull ' +
